@@ -1,7 +1,7 @@
 // Copyright (c) 2023, NeKz
 // SPDX-License-Identifier: MIT
 
-import * as flags from 'https://esm.sh/country-flag-emoji@1.0.3';
+import * as flags from 'country-flag-emoji';
 import { Campaign, Track, TrackRecord } from './models.ts';
 import { Zone, ZoneType } from './api.ts';
 

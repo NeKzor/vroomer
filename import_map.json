@@ -3,6 +3,7 @@
     "dotenv/": "https://deno.land/std@0.207.0/dotenv/",
     "testing/": "https://deno.land/std@0.207.0/testing/",
     "log/": "https://deno.land/std@0.207.0/log/",
-    "@js-temporal/polyfill": "npm:@js-temporal/polyfill@0.4.4"
+    "@js-temporal/polyfill": "https://esm.sh/v135/@js-temporal/polyfill@0.4.4",
+    "country-flag-emoji": "https://esm.sh/v135/country-flag-emoji@1.0.3"
   }
 }

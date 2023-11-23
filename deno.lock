@@ -1,27 +1,5 @@
 {
   "version": "3",
-  "packages": {
-    "specifiers": {
-      "npm:@js-temporal/polyfill@0.4.4": "npm:@js-temporal/polyfill@0.4.4"
-    },
-    "npm": {
-      "@js-temporal/polyfill@0.4.4": {
-        "integrity": "sha512-2X6bvghJ/JAoZO52lbgyAPFj8uCflhTo2g7nkFzEQdXd/D8rEeD4HtmTEpmtGCva260fcd66YNXBOYdnmHqSOg==",
-        "dependencies": {
-          "jsbi": "jsbi@4.3.0",
-          "tslib": "tslib@2.6.2"
-        }
-      },
-      "jsbi@4.3.0": {
-        "integrity": "sha512-SnZNcinB4RIcnEyZqFPdGPVgrg2AcnykiBy0sHVJQKHYeaLUvi3Exj+iaPpLnFVkDPZIV4U0yvgC9/R4uEAZ9g==",
-        "dependencies": {}
-      },
-      "tslib@2.6.2": {
-        "integrity": "sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==",
-        "dependencies": {}
-      }
-    }
-  },
   "remote": {
     "https://deno.land/std@0.207.0/assert/assert.ts": "9a97dad6d98c238938e7540736b826440ad8c1c1e54430ca4c4e623e585607ee",
     "https://deno.land/std@0.207.0/assert/assertion_error.ts": "4d0bde9b374dfbcbe8ac23f54f567b77024fb67dbb1906a852d67fe050d42f56",
@@ -34,7 +12,10 @@
     "https://deno.land/std@0.207.0/log/levels.ts": "6309147664e9e008cd6671610f2505c4c95f181f6bae4816a84b33e0aec66859",
     "https://deno.land/std@0.207.0/log/logger.ts": "180c50a07c43a556dc5794e913c82946399e89d683201d01c8f0091e1e4ae3fc",
     "https://deno.land/std@0.207.0/log/mod.ts": "a274d2129c8d08d4c96e0fb165a595e6c730b5130b437a9ce04364156bfe955a",
-    "https://esm.sh/country-flag-emoji@1.0.3": "2e6e6b1109522b77a989d4d8e848b58d77a5f18b94d5a99bbd4ffa1ec91745eb",
-    "https://esm.sh/v134/country-flag-emoji@1.0.3/denonext/country-flag-emoji.mjs": "8c892dd8bbee4d4c78e3fa09b57e601a2c06ac5b1abc1804fbdb4add83411f81"
+    "https://esm.sh/v135/@js-temporal/polyfill@0.4.4": "7b84fa832b22763869e2024bda3746956892883ac577a6f8c887f48ba4fc6cb5",
+    "https://esm.sh/v135/@js-temporal/polyfill@0.4.4/denonext/polyfill.mjs": "80d73642d51cc1614ca1e44191589f21358e2f421011c9972c82194abce22386",
+    "https://esm.sh/v135/country-flag-emoji@1.0.3": "5ed42d856ebb8d0360eeaa423ad88daeed1f929ba93e38301edf63ddb47648dd",
+    "https://esm.sh/v135/country-flag-emoji@1.0.3/denonext/country-flag-emoji.mjs": "8c892dd8bbee4d4c78e3fa09b57e601a2c06ac5b1abc1804fbdb4add83411f81",
+    "https://esm.sh/v135/jsbi@4.3.0/denonext/jsbi.mjs": "322cdb63f08384a92bd0c8a105b174e88e66852577e3b3c060d905cc17eb0896"
   }
 }
