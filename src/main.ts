@@ -165,6 +165,18 @@ const update = async () => {
   }
 };
 
+// TODO: Remove once Deno Deploy supports Array.fromAsync
+const fromAsync = async <T, U>(
+  iterableOrArrayLike: AsyncIterable<T>, 
+  mapFn: (value: Awaited<T>) => U, 
+): Promise<U[]> => {
+  const result: U[] = [];
+  for await (const entry of iterableOrArrayLike as AsyncIterable<T>) {
+    result.push(mapFn(entry));
+  }
+  return result;
+};
+
 const updateCampaign = async (ctx: Context) => {
   const activity = await ctx.trackmania.clubActivity(clubId);
 
@@ -182,7 +194,7 @@ const updateCampaign = async (ctx: Context) => {
     let campaign = (await kv.get<Campaign>(campaignKey)).value;
 
     const tracks = campaign
-      ? await Array.fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
+      ? await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
       : [];
 
     if (!campaign) {
@@ -262,7 +274,7 @@ const updateRecords = async (
 
   const recordsKey = ['records', campaign.uid, track.uid];
   const latestScore = Math.min(
-    ...await Array.fromAsync(kv.list<TrackRecord>({ prefix: recordsKey }), ({ value }) => value.score),
+    ...await fromAsync(kv.list<TrackRecord>({ prefix: recordsKey }), ({ value }) => value.score),
   );
 
   for (const { accountId, zoneId, score } of worldLeaderboard?.top ?? []) {
@@ -333,8 +345,8 @@ const sendCampaignUpdate = async (
 
     const data = {
       campaign,
-      tracks: await Array.fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
-      records: await Array.fromAsync(
+      tracks: await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
+      records: await fromAsync(
         kv.list<TrackRecord>({ prefix: ['records', campaign.uid] }),
         ({ value }) => value,
       ),
