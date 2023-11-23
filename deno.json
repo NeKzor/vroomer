@@ -20,10 +20,5 @@
   "compilerOptions": {
     "noUncheckedIndexedAccess": true
   },
-  "imports": {
-    "dotenv/": "https://deno.land/std@0.207.0/dotenv/",
-    "testing/": "https://deno.land/std@0.207.0/testing/",
-    "log/": "https://deno.land/std@0.207.0/log/",
-    "@js-temporal/polyfill": "npm:@js-temporal/polyfill@0.4.4"
-  }
+  "importMap": "./import_map.json"
 }
