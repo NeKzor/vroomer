@@ -9,9 +9,8 @@ import { logger } from './logger.ts';
 import { Campaign, Track, TrackRecord } from './models.ts';
 import { generateStats } from './stats.ts';
 
-const isUsingDenoDeploy = Deno.env.get('DENO_DEPLOY') !== '1';
-
-if (isUsingDenoDeploy) {
+const isUsingDenoDeploy = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined;
+if (!isUsingDenoDeploy) {
   await load({ export: true });
 }
 
