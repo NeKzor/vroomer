@@ -18,8 +18,18 @@ const kv = await Deno.openKv(isUsingDenoDeploy ? undefined : './.kv');
 
 const session = {
   file: '.login',
+  loginData: null,
 
   async tryLoad(client: UbisoftClient) {
+    if (isUsingDenoDeploy) {
+      if (!this.loginData) {
+        return false;
+      }
+
+      client.loginData = this.loginData;
+      return true;
+    }
+
     try {
       client.loginData = JSON.parse(await Deno.readTextFile(this.file));
 
@@ -34,7 +44,11 @@ const session = {
   },
 
   async save(client: UbisoftClient) {
-    await Deno.writeTextFile(this.file, JSON.stringify(client.loginData));
+    if (isUsingDenoDeploy) {
+      this.loginData = client.loginData;
+    } else {
+      await Deno.writeTextFile(this.file, JSON.stringify(client.loginData));
+    }
   },
 };
 
