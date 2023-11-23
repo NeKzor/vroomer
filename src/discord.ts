@@ -1,9 +1,9 @@
 // Copyright (c) 2023, NeKz
 // SPDX-License-Identifier: MIT
 
-import * as flags from 'country-flag-emoji';
 import { Campaign, Track, TrackRecord } from './models.ts';
-import { Zone, ZoneType } from './api.ts';
+import { Zone } from './api.ts';
+import { escapeMarkdown, formatScore, getEmojiFlag } from './utils.ts';
 
 export type MessageRecordBuildData = { wr: TrackRecord; track: Track };
 export type MessageCampaignBuildData = {
@@ -62,7 +62,9 @@ export class DiscordWebhook<MessageBuilderData> {
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to execute webhook : ${res.status} : ${await res.text()}`);
+      throw new Error(
+        `Failed to execute webhook : ${res.status} : ${await res.text()}`,
+      );
     }
   }
   async edit(messageId: string, data: MessageBuilderData) {
@@ -83,17 +85,21 @@ export class DiscordWebhook<MessageBuilderData> {
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to edit webhook : ${res.status} : ${await res.text()}`);
+      throw new Error(
+        `Failed to edit webhook : ${res.status} : ${await res.text()}`,
+      );
     }
   }
-  static buildRecordMessage({ wr, track }: MessageRecordBuildData): Record<string, unknown> {
-    const country = wr.user.zone[2] ? wr.user.zone[2].name : null;
-    const countryFlag = country ? flags.list.find((flag: { name: string }) => flag.name === country) : null;
-
+  static buildRecordMessage(
+    { wr, track }: MessageRecordBuildData,
+  ): Record<string, unknown> {
     return {
       embeds: [
         {
-          title: track.name.replace(/(\$[0-9a-fA-F]{3}|\$[WNOITSGZBEMwnoitsgzbem]{1})/g, ''),
+          title: track.name.replace(
+            /(\$[0-9a-fA-F]{3}|\$[WNOITSGZBEMwnoitsgzbem]{1})/g,
+            '',
+          ),
           url: 'https://trackmania.io/#/leaderboard/' + track.uid,
           color: 15772743,
           fields: [
@@ -104,7 +110,7 @@ export class DiscordWebhook<MessageBuilderData> {
             },
             {
               name: 'By',
-              value: escapeMarkdown(wr.user.name) + (countryFlag ? ' ' + countryFlag.emoji : ''),
+              value: escapeMarkdown(wr.user.name) + getEmojiFlag(wr.user),
               inline: true,
             },
           ],
@@ -147,45 +153,3 @@ export class DiscordWebhook<MessageBuilderData> {
     };
   }
 }
-
-const formatScore = (score: number | undefined | null) => {
-  if (score === undefined || score === null) {
-    return '';
-  }
-
-  const msec = score % 1000;
-  const tsec = Math.floor(score / 1000);
-  const sec = tsec % 60;
-  const min = Math.floor(tsec / 60);
-
-  return (
-    (min > 0 ? min + ':' : '') +
-    (sec < 10 && min > 0 ? '0' + sec : sec) +
-    '.' +
-    (msec < 100 ? (msec < 10 ? '00' + msec : '0' + msec) : msec)
-  );
-};
-
-const specialMdCharacters = [
-  '[',
-  ']',
-  '(',
-  ')',
-  '`',
-  '*',
-  '_',
-  '~',
-];
-
-const escapeMarkdown = (text: string) => {
-  return specialMdCharacters.reduce(
-    (title, char) => title.replaceAll(char, `\\${char}`),
-    text,
-  );
-};
-
-const getEmojiFlag = (user: TrackRecord['user']) => {
-  const country = user.zone[ZoneType.Country] ? user.zone[ZoneType.Country].name : null;
-  const flag = country ? flags.list.find((flag: { name: string }) => flag.name === country) : null;
-  return flag ? ' ' + flag.emoji : '';
-};
