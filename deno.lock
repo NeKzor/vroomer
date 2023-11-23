@@ -1,0 +1,40 @@
+{
+  "version": "3",
+  "packages": {
+    "specifiers": {
+      "npm:@js-temporal/polyfill@0.4.4": "npm:@js-temporal/polyfill@0.4.4"
+    },
+    "npm": {
+      "@js-temporal/polyfill@0.4.4": {
+        "integrity": "sha512-2X6bvghJ/JAoZO52lbgyAPFj8uCflhTo2g7nkFzEQdXd/D8rEeD4HtmTEpmtGCva260fcd66YNXBOYdnmHqSOg==",
+        "dependencies": {
+          "jsbi": "jsbi@4.3.0",
+          "tslib": "tslib@2.6.2"
+        }
+      },
+      "jsbi@4.3.0": {
+        "integrity": "sha512-SnZNcinB4RIcnEyZqFPdGPVgrg2AcnykiBy0sHVJQKHYeaLUvi3Exj+iaPpLnFVkDPZIV4U0yvgC9/R4uEAZ9g==",
+        "dependencies": {}
+      },
+      "tslib@2.6.2": {
+        "integrity": "sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==",
+        "dependencies": {}
+      }
+    }
+  },
+  "remote": {
+    "https://deno.land/std@0.207.0/assert/assert.ts": "9a97dad6d98c238938e7540736b826440ad8c1c1e54430ca4c4e623e585607ee",
+    "https://deno.land/std@0.207.0/assert/assertion_error.ts": "4d0bde9b374dfbcbe8ac23f54f567b77024fb67dbb1906a852d67fe050d42f56",
+    "https://deno.land/std@0.207.0/bytes/copy.ts": "939d89e302a9761dcf1d9c937c7711174ed74c59eef40a1e4569a05c9de88219",
+    "https://deno.land/std@0.207.0/dotenv/mod.ts": "039468f5c87d39b69d7ca6c3d68ebca82f206ec0ff5e011d48205eea292ea5a6",
+    "https://deno.land/std@0.207.0/fmt/colors.ts": "34b3f77432925eb72cf0bfb351616949746768620b8e5ead66da532f93d10ba2",
+    "https://deno.land/std@0.207.0/fs/exists.ts": "cb59a853d84871d87acab0e7936a4dac11282957f8e195102c5a7acb42546bb8",
+    "https://deno.land/std@0.207.0/io/buf_writer.ts": "599247add52c1f42c3674366d5783a25c69ceb7277b0694cc854d49f5710e77f",
+    "https://deno.land/std@0.207.0/log/handlers.ts": "3a0883f65567f59a9a88e44c972b24b924621bc28ead91af11d7a6da93c4a64c",
+    "https://deno.land/std@0.207.0/log/levels.ts": "6309147664e9e008cd6671610f2505c4c95f181f6bae4816a84b33e0aec66859",
+    "https://deno.land/std@0.207.0/log/logger.ts": "180c50a07c43a556dc5794e913c82946399e89d683201d01c8f0091e1e4ae3fc",
+    "https://deno.land/std@0.207.0/log/mod.ts": "a274d2129c8d08d4c96e0fb165a595e6c730b5130b437a9ce04364156bfe955a",
+    "https://esm.sh/country-flag-emoji@1.0.3": "2e6e6b1109522b77a989d4d8e848b58d77a5f18b94d5a99bbd4ffa1ec91745eb",
+    "https://esm.sh/v134/country-flag-emoji@1.0.3/denonext/country-flag-emoji.mjs": "8c892dd8bbee4d4c78e3fa09b57e601a2c06ac5b1abc1804fbdb4add83411f81"
+  }
+}

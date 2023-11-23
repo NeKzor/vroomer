@@ -1,0 +1,29 @@
+{
+  "tasks": {
+    "dev": "deno run --unstable-kv --unstable-cron --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com --watch src/main.ts",
+    "update": "deno run --no-prompt --unstable-kv --unstable-cron --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com src/main.ts",
+    "check": "deno fmt --check && deno lint && deno task check:types",
+    "check:types": "deno check --unstable-kv --no-lock src/**/*.ts"
+  },
+  "lint": {
+    "exclude": [
+      "docker"
+    ]
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 120,
+    "indentWidth": 2,
+    "singleQuote": true,
+    "proseWrap": "preserve"
+  },
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  },
+  "imports": {
+    "dotenv/": "https://deno.land/std@0.207.0/dotenv/",
+    "testing/": "https://deno.land/std@0.207.0/testing/",
+    "log/": "https://deno.land/std@0.207.0/log/",
+    "@js-temporal/polyfill": "npm:@js-temporal/polyfill@0.4.4"
+  }
+}
