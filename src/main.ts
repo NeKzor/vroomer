@@ -167,8 +167,8 @@ const update = async () => {
 
 // TODO: Remove once Deno Deploy supports Array.fromAsync
 const fromAsync = async <T, U>(
-  iterableOrArrayLike: AsyncIterable<T>, 
-  mapFn: (value: Awaited<T>) => U, 
+  iterableOrArrayLike: AsyncIterable<T>,
+  mapFn: (value: Awaited<T>) => U,
 ): Promise<U[]> => {
   const result: U[] = [];
   for await (const entry of iterableOrArrayLike as AsyncIterable<T>) {
