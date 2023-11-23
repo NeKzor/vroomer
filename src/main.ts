@@ -5,7 +5,7 @@ import { load } from 'dotenv/mod.ts';
 import { Temporal } from '@js-temporal/polyfill';
 import { Audiences, ClubActivity, TrackmaniaClient, TrackmaniaOAuthClient, UbisoftClient, Zone, Zones } from './api.ts';
 import { DiscordWebhook } from './discord.ts';
-import { logger } from './logger.ts';
+import { flushFileLogger, logger } from './logger.ts';
 import { Campaign, Track, TrackRecord } from './models.ts';
 import { generateStats } from './stats.ts';
 
@@ -362,9 +362,12 @@ kv.listenQueue(async (message) => {
       break;
     }
   }
+
+  flushFileLogger();
 });
 
 Deno.cron('Update', '*/1 * * * *', async () => {
   logger.info('Updating');
   await update();
+  flushFileLogger();
 });
