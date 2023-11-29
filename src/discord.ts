@@ -144,12 +144,15 @@ export class DiscordWebhook<MessageBuilderData> {
 
     const wrs = records
       .map(
-        (wr) =>
-          `${trackNames.get(wr.track_uid)?.split(' - ')?.at(1) ?? ''} | ${formatScore(wr.score)} by ${
+        (wr) => {
+          // FIXME: Make track name extraction a RegExp in UpdateWebhook or remove this completely
+          const trackName = trackNames.get(wr.track_uid) ?? '';
+          return `${trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName} | ${formatScore(wr.score)} by ${
             escapeMarkdown(
               wr.user.name,
             )
-          }${getEmojiFlag(wr.user)}`,
+          }${getEmojiFlag(wr.user)}`;
+        },
       );
 
     const wrRankings = stats.leaderboard.map(
