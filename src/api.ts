@@ -8,29 +8,75 @@ export enum Audiences {
   NadeoClubServices = 'NadeoClubServices',
 }
 
+export interface UbisoftClientSession {
+  platformType: string;
+  ticket: string;
+  twoFactorAuthenticationTicket: string | null;
+  profileId: string;
+  userId: string;
+  nameOnPlatform: string;
+  environment: string;
+  expiration: string;
+  spaceId: string;
+  clientIp: string;
+  clientIpCountry: string;
+  serverTime: string;
+  sessionId: string;
+  sessionKey: string;
+  rememberMeTicket: string | null;
+}
+
 export class UbisoftClient {
   baseUrl: string;
-  loginData: any;
+  loginData: UbisoftClientSession | null;
+
+  onRequest?: (args: { url: string; method: string }) => void;
+  onFetch?: (args: { url: string; method: string; res: Response }) => void;
 
   #auth: string;
 
-  constructor(options: { email: string; password: string }) {
+  constructor(
+    options: {
+      email: string;
+      password: string;
+      onRequest?: (args: { url: string; method: string }) => void;
+      onFetch?: (args: { url: string; method: string; res: Response }) => void;
+    },
+  ) {
     this.baseUrl = 'https://public-ubiservices.ubi.com';
     this.loginData = null;
+    this.onRequest = options.onRequest;
+    this.onFetch = options.onFetch;
     this.#auth = btoa(`${options.email}:${options.password}`);
   }
-  async login() {
-    const res = await fetch(`${this.baseUrl}/v3/profiles/sessions`, {
-      method: 'POST',
+  async login(autoRefresh = true) {
+    if (autoRefresh && this.loginData && new Date(this.loginData.expiration) > new Date()) {
+      return false;
+    }
+
+    const url = `${this.baseUrl}/v3/profiles/sessions`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         'Ubi-AppId': '86263886-327a-4328-ac69-527f0d20a237',
         'Authorization': 'Basic ' + this.#auth,
       },
     });
+
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+
     this.loginData = await res.json();
 
-    return this;
+    return true;
   }
 }
 
@@ -40,93 +86,210 @@ export enum ApiEndpoint {
   Competition = 'https://competition.trackmania.nadeo.club/api',
 }
 
-export class TrackmaniaClient {
-  #auth: string;
-  #loginData: any | null;
-  #loginDataNadeo: any | null;
+export interface TrackmaniaClientToken {
+  accessToken: string;
+  refreshToken: string;
+}
 
-  constructor(ticket: string) {
-    this.#auth = ticket;
-    this.#loginData = null;
-    this.#loginDataNadeo = null;
+export interface TrackmaniaJwtPayload {
+  jti: string;
+  iss: string;
+  iat: number;
+  rat: number;
+  exp: number;
+  aud: string;
+  usg: string;
+  sid: string;
+  sub: string;
+  aun: string;
+  rtk: boolean;
+  pce: boolean;
+}
+
+export class TrackmaniaClient {
+  loginData: TrackmaniaClientToken | null;
+  loginDataNadeo: TrackmaniaClientToken | null;
+
+  onRequest?: (args: { url: string; method: string }) => void;
+  onFetch?: (args: { url: string; method: string; res: Response }) => void;
+
+  constructor(options?: {
+    onRequest?: (args: { url: string; method: string }) => void;
+    onFetch?: (args: { url: string; method: string; res: Response }) => void;
+  }) {
+    this.loginData = null;
+    this.loginDataNadeo = null;
+    this.onRequest = options?.onRequest;
+    this.onFetch = options?.onFetch;
   }
-  async login() {
-    const res = await fetch(`${ApiEndpoint.Prod}/v2/authentication/token/ubiservices`, {
-      method: 'POST',
+  #parseJwtToken(token: string): TrackmaniaJwtPayload {
+    return JSON.parse(atob(token.split('.').at(1)!));
+  }
+  async login(ticket: string, autoRefresh = true) {
+    if (autoRefresh && this.loginData) {
+      const accessPayload = this.#parseJwtToken(this.loginData.accessToken);
+      if (new Date(accessPayload.exp * 1_000) > new Date()) {
+        return false;
+      }
+
+      const refreshPayload = this.#parseJwtToken(this.loginData.refreshToken);
+      if (new Date(refreshPayload.exp * 1_000) > new Date()) {
+        await this.refresh();
+        return true;
+      }
+    }
+
+    const url = `${ApiEndpoint.Prod}/v2/authentication/token/ubiservices`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'ubi_v1 t=' + this.#auth,
+        'Authorization': 'ubi_v1 t=' + ticket,
       },
     });
 
-    if (res.status !== 200) {
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
-    this.#loginData = await res.json();
+    this.loginData = await res.json();
 
-    return this;
+    return true;
   }
-  async loginNadeo(audience?: Audiences) {
-    if (!this.#loginData) {
+  async loginNadeo(audience?: Audiences, autoRefresh = true) {
+    if (!this.loginData) {
       throw new Error('Client is not logged in. Did you forget to call login()?');
     }
 
+    if (autoRefresh && this.loginDataNadeo) {
+      const accessPayload = this.#parseJwtToken(this.loginDataNadeo.accessToken);
+      if (new Date(accessPayload.exp * 1_000) > new Date()) {
+        return false;
+      }
+
+      const refreshPayload = this.#parseJwtToken(this.loginDataNadeo.refreshToken);
+      if (new Date(refreshPayload.exp * 1_000) > new Date()) {
+        await this.refreshNadeo();
+        return true;
+      }
+    }
+
+    const url = `${ApiEndpoint.Prod}/v2/authentication/token/nadeoservices`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
     audience ??= Audiences.NadeoLiveServices;
 
-    const res = await fetch(`${ApiEndpoint.Prod}/v2/authentication/token/nadeoservices`, {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'nadeo_v1 t=' + this.#loginData.accessToken,
+        'Authorization': 'nadeo_v1 t=' + this.loginData.accessToken,
       },
       body: JSON.stringify({ audience }),
     });
 
-    if (res.status !== 200) {
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
-    this.#loginDataNadeo = await res.json();
+    this.loginDataNadeo = await res.json();
 
-    return this;
+    return true;
   }
   async refresh() {
-    const res = await fetch(`${ApiEndpoint.Prod}/v2/authentication/token/refresh`, {
-      method: 'POST',
+    if (!this.loginData) {
+      throw new Error('Need to be logged in first.');
+    }
+
+    const url = `${ApiEndpoint.Prod}/v2/authentication/token/refresh`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'nadeo_v1 t=' + this.#loginData.refreshToken,
+        'Authorization': 'ubi_v1 t=' + this.loginData.refreshToken,
       },
     });
 
-    if (res.status !== 200) {
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
-    return this;
+    this.loginData = await res.json();
+
+    return this.loginData;
   }
-  async get<T>(route: string, nadeo = false, nadeoEndpoint = ApiEndpoint.LiveServices) {
-    if (!nadeo && !this.#loginData) {
-      throw new Error('need to be logged in first');
+  async refreshNadeo() {
+    if (!this.loginDataNadeo) {
+      throw new Error('Need to be logged in first.');
     }
 
-    if (nadeo && !this.#loginDataNadeo) {
+    const url = `${ApiEndpoint.Prod}/v2/authentication/token/refresh`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'nadeo_v1 t=' + this.loginDataNadeo.refreshToken,
+      },
+    });
+
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+
+    this.loginDataNadeo = await res.json();
+
+    return this.loginDataNadeo;
+  }
+  async get<T>(route: string, nadeo = false, nadeoEndpoint = ApiEndpoint.LiveServices) {
+    if (!nadeo && !this.loginData) {
+      throw new Error('Need to be logged in first.');
+    }
+
+    if (nadeo && !this.loginDataNadeo) {
       throw new Error('need to be logged in with nadeo first');
     }
 
-    const accessToken = nadeo ? this.#loginDataNadeo.accessToken : this.#loginData.accessToken;
+    const accessToken = nadeo ? this.loginDataNadeo!.accessToken : this.loginData!.accessToken;
     const baseUrl = nadeo ? nadeoEndpoint : ApiEndpoint.Prod;
 
-    const res = await fetch(baseUrl + route, {
-      method: 'GET',
+    const url = baseUrl + route;
+    const method = 'GET';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'nadeo_v1 t=' + accessToken,
       },
     });
 
-    if (res.status !== 200) {
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
@@ -188,7 +351,7 @@ export class TrackmaniaClient {
   async downloadFile(url: string) {
     const res = await fetch(url, {});
 
-    if (res.status !== 200) {
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
@@ -274,7 +437,7 @@ export class Zones {
     }
 
     if (zonePath.length === 0) {
-      console.warn('Zone by path not found:', zonePath);
+      throw Error('Zone by path not found: ' + zonePath);
     }
 
     this.cachePaths.set(zonePath, zones);
@@ -453,58 +616,81 @@ export type ClubCampaignResponse = {
 export class TrackmaniaOAuthClient {
   #id: string;
   #secret: string;
-  #loginData: any | null;
 
-  constructor(options: { id: string; secret: string }) {
+  loginData: any | null;
+
+  onRequest?: (args: { url: string; method: string }) => void;
+  onFetch?: (args: { url: string; method: string; res: Response }) => void;
+
+  constructor(
+    options: {
+      id: string;
+      secret: string;
+      onRequest?: (args: { url: string; method: string }) => void;
+      onFetch?: (args: { url: string; method: string; res: Response }) => void;
+    },
+  ) {
     this.#id = options.id;
     this.#secret = options.secret;
-    this.#loginData = null;
+    this.loginData = null;
+    this.onRequest = options.onRequest;
+    this.onFetch = options.onFetch;
   }
   async login() {
     const url = `https://api.trackmania.com/api/access_token`;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
 
     const res = await fetch(url, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: `grant_type=client_credentials&client_id=${this.#id}&client_secret=${this.#secret}`,
     });
 
-    if (res.status !== 200) {
+    this.onFetch?.call(this, { url, method, res });
+
+    if (!res.ok) {
       throw new Error(await res.text());
     }
 
-    this.#loginData = await res.json();
+    this.loginData = await res.json();
 
     return this;
   }
   async displayNames(ids: string[]): Promise<Record<string, string>> {
-    if (this.#loginData == null) {
+    if (this.loginData == null) {
       await this.login();
     }
 
     const url = `https://api.trackmania.com/api/display-names?accountId[]=${ids.join('&accountId[]=')}`;
+    const method = 'GET';
 
     const fetchDisplayNames = async () => {
+      this.onRequest?.call(this, { url, method });
+
       const res = await fetch(url, {
-        method: 'GET',
+        method,
         headers: {
-          'Authorization': `Bearer ${this.#loginData.access_token}`,
+          'Authorization': `Bearer ${this.loginData.access_token}`,
         },
       });
+
+      this.onFetch?.call(this, { url, method, res });
 
       return res;
     };
 
     let res = await fetchDisplayNames();
 
-    if (res.status !== 200) {
+    if (!res.ok) {
       if (res.status === 401) {
         this.login();
 
         res = await fetchDisplayNames();
-        if (res.status !== 200) {
+        if (!res.ok) {
           throw new Error(`Fetch display names after reauth failed : ${res.status} : ${await res.text()}`);
         }
       } else {

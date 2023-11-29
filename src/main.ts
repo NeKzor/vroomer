@@ -3,8 +3,17 @@
 
 import { load } from 'dotenv/mod.ts';
 import { join } from 'path/mod.ts';
-import { Temporal } from '@js-temporal/polyfill';
-import { Audiences, ClubActivity, TrackmaniaClient, TrackmaniaOAuthClient, UbisoftClient, Zone, Zones } from './api.ts';
+import {
+  Audiences,
+  ClubActivity,
+  TrackmaniaClient,
+  TrackmaniaClientToken,
+  TrackmaniaOAuthClient,
+  UbisoftClient,
+  UbisoftClientSession,
+  Zone,
+  Zones,
+} from './api.ts';
 import { DiscordWebhook } from './discord.ts';
 import { flushFileLogger, logger } from './logger.ts';
 import { Campaign, Track, TrackRecord } from './models.ts';
@@ -19,44 +28,54 @@ const kv = await Deno.openKv(isUsingDenoDeploy ? undefined : './.kv');
 
 const session = {
   file: '.login',
-  loginData: null,
+  ubisoft: {
+    loginData: null as UbisoftClientSession | null,
+  },
+  trackmania: {
+    loginData: null as TrackmaniaClientToken | null,
+    loginDataNadeo: null as TrackmaniaClientToken | null,
+  },
 
-  async tryLoad(client: UbisoftClient) {
-    if (isUsingDenoDeploy) {
-      if (!this.loginData) {
-        return false;
+  async restore(ubisoft: UbisoftClient, trackmania: TrackmaniaClient) {
+    if (!isUsingDenoDeploy) {
+      try {
+        const login = JSON.parse(await Deno.readTextFile(this.file));
+        ubisoft.loginData = login.ubisoft.loginData;
+        trackmania.loginData = login.trackmania.loginData;
+        trackmania.loginDataNadeo = login.trackmania.loginDataNadeo;
+      } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+          return;
+        }
+        logger.error(err);
       }
-
-      client.loginData = this.loginData;
-      return true;
-    }
-
-    try {
-      client.loginData = JSON.parse(await Deno.readTextFile(this.file));
-
-      const now = Temporal.Now.instant();
-      const then = Temporal.Instant.from(client.loginData.expiration);
-      const ago = then.until(now);
-      const isExpired = ago.seconds <= 0;
-      return isExpired;
-    } catch {
-      return false;
+      logger.info('Restored session');
     }
   },
 
-  async save(client: UbisoftClient) {
+  async save(ubisoft: UbisoftClient, trackmania: TrackmaniaClient) {
     if (isUsingDenoDeploy) {
-      this.loginData = client.loginData;
+      this.ubisoft.loginData = ubisoft.loginData;
+      this.ubisoft.loginData = ubisoft.loginData;
+      this.trackmania.loginData = trackmania.loginData;
+      this.trackmania.loginDataNadeo = trackmania.loginDataNadeo;
     } else {
-      await Deno.writeTextFile(this.file, JSON.stringify(client.loginData));
+      await Deno.writeTextFile(
+        this.file,
+        JSON.stringify({
+          ubisoft: {
+            loginData: ubisoft.loginData,
+          },
+          trackmania: {
+            loginData: trackmania.loginData,
+            loginDataNadeo: trackmania.loginDataNadeo,
+          },
+        }),
+      );
     }
+    logger.info('Saved session');
   },
 };
-
-const oauthClient = new TrackmaniaOAuthClient({
-  id: Deno.env.get('TRACKMANIA_CLIENT_ID')!,
-  secret: Deno.env.get('TRACKMANIA_CLIENT_SECRET')!,
-});
 
 const nameResolver = {
   cache: new Map<string, string>(),
@@ -97,14 +116,32 @@ const nameResolver = {
   },
 };
 
+const logFetchRequest = ({ method, url, res }: { method: string; url: string; res: Response }) => {
+  logger.info(`[${method}] ${url} : ${res.status}`);
+};
+
+const ubisoft = new UbisoftClient({
+  email: Deno.env.get('UBI_EMAIL')!,
+  password: Deno.env.get('UBI_PW')!,
+  onFetch: logFetchRequest,
+});
+const trackmania = new TrackmaniaClient({
+  onFetch: logFetchRequest,
+});
 const discordRecordUpdate = new DiscordWebhook({
   url: Deno.env.get('DISCORD_WEBHOOK_RECORD_UPDATE')!,
   messageBuilder: DiscordWebhook.buildRecordMessage,
+  onFetch: logFetchRequest,
 });
 const discordCampaignUpdate = new DiscordWebhook({
   url: Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
   optimizeDataUsage: true,
   messageBuilder: DiscordWebhook.buildRankingsMessage,
+  onFetch: logFetchRequest,
+});
+const oauthClient = new TrackmaniaOAuthClient({
+  id: Deno.env.get('TRACKMANIA_CLIENT_ID')!,
+  secret: Deno.env.get('TRACKMANIA_CLIENT_SECRET')!,
 });
 
 const replayStoragePath = Deno.env.get('REPLAY_STORAGE_PATH')!;
@@ -126,28 +163,26 @@ if (replayStoragePath !== 'none') {
   }
 }
 
+await session.restore(ubisoft, trackmania);
+
 interface Context {
   trackmania: TrackmaniaClient;
   zones: Zones;
   clubId: string;
   clubCampaignName: string;
 }
+
 const update = async () => {
-  const ubisoft = new UbisoftClient({
-    email: Deno.env.get('UBI_EMAIL')!,
-    password: Deno.env.get('UBI_PW')!,
-  });
-
   try {
-    if (!await session.tryLoad(ubisoft)) {
-      await ubisoft.login();
-      await session.save(ubisoft);
+    const newUbisoftLogin = await ubisoft.login();
+    const newNadeoLogin = await trackmania.login(ubisoft.loginData!.ticket);
+    const newTrackmaniaNadeoLogin = await trackmania.loginNadeo(Audiences.NadeoLiveServices);
+
+    logger.info({ newUbisoftLogin, newNadeoLogin, newTrackmaniaNadeoLogin });
+
+    if (newUbisoftLogin || newNadeoLogin || newTrackmaniaNadeoLogin) {
+      await session.save(ubisoft, trackmania);
     }
-
-    const trackmania = new TrackmaniaClient(ubisoft.loginData.ticket);
-
-    await trackmania.login();
-    await trackmania.loginNadeo(Audiences.NadeoLiveServices);
 
     const zones = await trackmania.zones();
     const allowedKeys: (keyof Zone)[] = ['name', 'parentId', 'zoneId'];
@@ -407,7 +442,13 @@ kv.listenQueue(async (message) => {
             .replaceAll(/[\\/ ]/g, '_') + '.replay.gbx';
 
           file = await Deno.open(join(folderPath, fileName), { write: true, createNew: true });
-          const res = await fetch(`https://prod.trackmania.core.nadeo.online/storageObjects/${wr.uid}`);
+
+          const url = `https://prod.trackmania.core.nadeo.online/storageObjects/${wr.uid}`;
+
+          logger.info(`[GET] ${url}`);
+          const res = await fetch(url);
+          logger.info(`[GET] ${url} : ${res.status}`);
+
           await res.body?.pipeTo(file.writable);
         } catch (err) {
           logger.error(err);

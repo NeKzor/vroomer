@@ -39,27 +39,40 @@ export class DiscordWebhook<MessageBuilderData> {
   public optimizeDataUsage: boolean;
   public lastCachedMessage: string;
   public messageBuilder: (data: MessageBuilderData) => Record<string, unknown>;
+  public onRequest?: (args: { url: string; method: string }) => void;
+  public onFetch?: (args: { url: string; method: string; res: Response }) => void;
 
   constructor(
     options: {
       url: string;
       optimizeDataUsage?: boolean;
       messageBuilder: (data: MessageBuilderData) => Record<string, unknown>;
+      onRequest?: (args: { url: string; method: string }) => void;
+      onFetch?: (args: { url: string; method: string; res: Response }) => void;
     },
   ) {
     this.url = options.url;
     this.optimizeDataUsage = options.optimizeDataUsage ?? false;
     this.lastCachedMessage = '';
     this.messageBuilder = options.messageBuilder;
+    this.onRequest = options.onRequest;
+    this.onFetch = options.onFetch;
   }
   async send(data: MessageBuilderData) {
-    const res = await fetch(this.url, {
-      method: 'POST',
+    const url = this.url;
+    const method = 'POST';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(this.messageBuilder(data)),
     });
+
+    this.onFetch?.call(this, { url, method, res });
 
     if (!res.ok) {
       throw new Error(
@@ -76,13 +89,20 @@ export class DiscordWebhook<MessageBuilderData> {
       this.lastCachedMessage = message;
     }
 
-    const res = await fetch(`${this.url}/messages/${messageId}`, {
-      method: 'PATCH',
+    const url = `${this.url}/messages/${messageId}`;
+    const method = 'PATCH';
+
+    this.onRequest?.call(this, { url, method });
+
+    const res = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(this.messageBuilder(data)),
     });
+
+    this.onFetch?.call(this, { url, method, res });
 
     if (!res.ok) {
       throw new Error(
