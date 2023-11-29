@@ -8,7 +8,7 @@ const isUsingDenoDeploy = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined;
 const level: log.LevelName = 'INFO';
 
 const formatter = ({ datetime, levelName, msg, args }: log.LogRecord) =>
-  `${datetime.toISOString()} ${levelName} ${msg} ${args.join(' ')}`;
+  `${datetime.toISOString()} ${levelName} ${msg} ${args.map((arg) => Deno.inspect(arg)).join(' ')}`;
 
 const consoleHandler = new log.handlers.ConsoleHandler(level, { formatter });
 
