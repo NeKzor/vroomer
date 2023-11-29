@@ -8,17 +8,20 @@ Campaign world record updates for your Trackmania club!
 
 - World records updates and statistics
 - Campaign overview and rankings
+- Replay storage
+- Can be managed via application commands
+- [Deno Deploy](https://deno.com/deploy) support
 
 ## Requirements
 
 - [Deno](https://deno.com)
 - Trackmania OAuth2 application for resolving display names
 - Credentials of Ubisoft account which owns the game
-- Two Discord webhook URLs
-  - First one is for sending world record updates
-  - Second one is for updating campaign rankings
+- Optional: Discord application
 
 ## Usage
+
+### Single Mode Club (Deno Deploy)
 
 - Create .env file `cp .env.example .env`
 - Configure `.env`
@@ -27,10 +30,18 @@ Campaign world record updates for your Trackmania club!
   - Modify `DISCORD_CAMPAIGN_UPDATE_MESSAGE_ID` in `.env`
 - Rerun `deno task update`
 
+### Bot Mode
+
+- Create .env file `cp .env.example .env`
+- Configure `.env`
+- Run `deno task update`
+- Run `deno task bot:start`
+
 ## Notice
 
-- Record updates are scheduled every minute.
+- Record updates are scheduled every minute as long as the `deno task update` process runs.
 - Ranking updates are only send when there is a change.
+- Running in bot mode is optional but obviously cannot run on Deno Deploy.
 
 ## License
 
