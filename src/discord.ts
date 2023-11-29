@@ -137,17 +137,24 @@ export class DiscordWebhook<MessageBuilderData> {
   static buildRankingsMessage(
     { campaign, tracks, records, stats, rankings }: MessageCampaignBuildData,
   ): Record<string, unknown> {
-    const trackNames = tracks.reduce((names, track) => {
-      names.set(track.uid, track.name);
+    const trackMapping = tracks.reduce((names, track) => {
+      names.set(track.uid, track);
       return names;
-    }, new Map<string, string>());
+    }, new Map<Track['uid'], Track>());
 
     const wrs = records
+      .sort((a, b) => {
+        const posA = trackMapping.get(a.track_uid)?.position ?? 0;
+        const posB = trackMapping.get(b.track_uid)?.position ?? 0;
+        return posA - posB;
+      })
       .map(
         (wr) => {
           // FIXME: Make track name extraction a RegExp in UpdateWebhook or remove this completely
-          const trackName = trackNames.get(wr.track_uid) ?? '';
-          return `${trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName} | ${formatScore(wr.score)} by ${
+          const trackName = trackMapping.get(wr.track_uid)?.name ?? '';
+          return `${trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName} | ${
+            formatScore(wr.score)
+          } by ${
             escapeMarkdown(
               wr.user.name,
             )

@@ -16,6 +16,7 @@ export type Track = {
   campaign_uid: string;
   uid: string;
   id: string;
+  position: number;
   name: string;
   thumbnail: string;
 };

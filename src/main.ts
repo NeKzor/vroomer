@@ -218,14 +218,17 @@ const updateCampaign = async (
     : [];
 
   if (!campaign) {
-    const result = await kv.set(campaignKey, {
-      uid: seasonUid,
-      name,
-      event: {
-        startsAt: startTimestamp,
-        endsAt: endTimestamp,
-      },
-    });
+    const result = await kv.set(
+      campaignKey,
+      {
+        uid: seasonUid,
+        name,
+        event: {
+          startsAt: startTimestamp,
+          endsAt: endTimestamp,
+        },
+      } satisfies Campaign,
+    );
 
     if (result.ok) {
       campaign = (await kv.get<Campaign>(campaignKey)).value;
@@ -244,26 +247,30 @@ const updateCampaign = async (
   const trackWrs = new Map<string, TrackRecord[]>();
   const trackHistory = new Map<string, TrackRecord[]>();
 
-  for (const { mapUid } of playlist) {
+  for (const { mapUid, position } of playlist) {
     const { name, mapId, thumbnailUrl } = maps.find((map) => map.mapUid === mapUid);
     logger.info(name, mapUid);
 
     let track = tracks.find((track) => track.uid === mapUid) ?? null;
-    if (!track) {
-      const trackKey = ['tracks', campaign.uid, mapUid];
+    //if (!track) {
+    const trackKey = ['tracks', campaign.uid, mapUid];
 
-      const result = await kv.set(trackKey, {
+    const result = await kv.set(
+      trackKey,
+      {
         campaign_uid: campaign.uid,
         uid: mapUid,
         id: mapId,
+        position,
         name,
         thumbnail: thumbnailUrl.slice(thumbnailUrl.lastIndexOf('/') + 1, -4),
-      });
+      } satisfies Track,
+    );
 
-      if (result.ok) {
-        track = (await kv.get<Track>(trackKey)).value;
-      }
+    if (result.ok) {
+      track = (await kv.get<Track>(trackKey)).value;
     }
+    //}
 
     if (!track) {
       logger.warning(`Failed to find or create track ${name}.`);
@@ -367,10 +374,7 @@ const sendCampaignUpdate = async (
     const data = {
       campaign,
       tracks: await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
-      records: await fromAsync(
-        kv.list<TrackRecord>({ prefix: ['records', campaign.uid] }),
-        ({ value }) => value,
-      ),
+      records: await fromAsync(kv.list<TrackRecord>({ prefix: ['records', campaign.uid] }), ({ value }) => value),
       rankings: topWorldRankings.map((ranking) => {
         return {
           user: {
