@@ -35,31 +35,26 @@ export type MessageBuilderFunction =
   | typeof DiscordWebhook.buildRankingsMessage;
 
 export class DiscordWebhook<MessageBuilderData> {
-  public url: string;
-  public optimizeDataUsage: boolean;
-  public lastCachedMessage: string;
   public messageBuilder: (data: MessageBuilderData) => Record<string, unknown>;
   public onRequest?: (args: { url: string; method: string }) => void;
   public onFetch?: (args: { url: string; method: string; res: Response }) => void;
 
   constructor(
     options: {
-      url: string;
       optimizeDataUsage?: boolean;
       messageBuilder: (data: MessageBuilderData) => Record<string, unknown>;
       onRequest?: (args: { url: string; method: string }) => void;
       onFetch?: (args: { url: string; method: string; res: Response }) => void;
     },
   ) {
-    this.url = options.url;
-    this.optimizeDataUsage = options.optimizeDataUsage ?? false;
-    this.lastCachedMessage = '';
     this.messageBuilder = options.messageBuilder;
     this.onRequest = options.onRequest;
     this.onFetch = options.onFetch;
   }
-  async send(data: MessageBuilderData) {
-    const url = this.url;
+  async send(webhookUrl: string, data: MessageBuilderData) {
+    const body = JSON.stringify(this.messageBuilder(data));
+
+    const url = webhookUrl;
     const method = 'POST';
 
     this.onRequest?.call(this, { url, method });
@@ -69,7 +64,7 @@ export class DiscordWebhook<MessageBuilderData> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(this.messageBuilder(data)),
+      body,
     });
 
     this.onFetch?.call(this, { url, method, res });
@@ -79,17 +74,16 @@ export class DiscordWebhook<MessageBuilderData> {
         `Failed to execute webhook : ${res.status} : ${await res.text()}`,
       );
     }
+
+    return body;
   }
-  async edit(messageId: string, data: MessageBuilderData) {
-    const message = JSON.stringify(this.messageBuilder(data));
-    if (this.optimizeDataUsage) {
-      if (this.lastCachedMessage === message) {
-        return;
-      }
-      this.lastCachedMessage = message;
+  async edit(webhookUrl: string, messageId: string, data: MessageBuilderData, lastCachedMessage = '') {
+    const body = JSON.stringify(this.messageBuilder(data));
+    if (lastCachedMessage.length && lastCachedMessage === body) {
+      return;
     }
 
-    const url = `${this.url}/messages/${messageId}`;
+    const url = `${webhookUrl}/messages/${messageId}`;
     const method = 'PATCH';
 
     this.onRequest?.call(this, { url, method });
@@ -99,7 +93,7 @@ export class DiscordWebhook<MessageBuilderData> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(this.messageBuilder(data)),
+      body,
     });
 
     this.onFetch?.call(this, { url, method, res });
@@ -109,6 +103,8 @@ export class DiscordWebhook<MessageBuilderData> {
         `Failed to edit webhook : ${res.status} : ${await res.text()}`,
       );
     }
+
+    return body;
   }
   static buildRecordMessage(
     { wr, track }: MessageRecordBuildData,

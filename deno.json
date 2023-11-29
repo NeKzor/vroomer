@@ -2,13 +2,10 @@
   "tasks": {
     "dev": "deno run --unstable-kv --unstable-cron --allow-env --allow-read=./replays,./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./replays,./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com,trackmania-prod-storage-map-record.s3.eu-west-1.amazonaws.com --watch src/main.ts",
     "update": "deno run --no-prompt --unstable-kv --unstable-cron --allow-env --allow-read=./replays,./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./replays,./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com,trackmania-prod-storage-map-record.s3.eu-west-1.amazonaws.com src/main.ts",
+    "bot:dev": "deno run --no-prompt --unstable-kv --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example,commands,events --allow-write=./.kv,./logs --allow-net=discord.com,gateway.discord.gg,gateway-us-east1-b.discord.gg,gateway-us-east1-c.discord.gg,gateway-us-east1-d.discord.gg,deno.land,cdn.discord.com,cdn.discordapp.com --watch src/bot/main.ts",
+    "bot:start": "deno run --no-prompt --unstable-kv --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example,commands,events --allow-write=./.kv,./logs --allow-net=discord.com,gateway.discord.gg,gateway-us-east1-b.discord.gg,gateway-us-east1-c.discord.gg,gateway-us-east1-d.discord.gg,deno.land,cdn.discord.com,cdn.discordapp.com src/bot/main.ts",
     "check": "deno fmt --check && deno lint && deno task check:types",
     "check:types": "deno check --unstable-kv --no-lock src/**/*.ts"
-  },
-  "lint": {
-    "exclude": [
-      "docker"
-    ]
   },
   "fmt": {
     "useTabs": false,

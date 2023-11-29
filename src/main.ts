@@ -19,56 +19,52 @@ import { Campaign, Track, TrackRecord } from './models.ts';
 import { generateStats } from './stats.ts';
 import { NameResolver } from './resolver.ts';
 import { Session } from './session.ts';
+import type { UpdateWebhook } from './bot/services/webhooks.ts';
+import { db } from './bot/services/db.ts';
 
 const isUsingDenoDeploy = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined;
 if (!isUsingDenoDeploy) {
   await load({ export: true });
 }
 
+const isUsingSingleClubMode = Deno.env.get('CLUB_ID')! !== 'none';
+
 const kv = await Deno.openKv(isUsingDenoDeploy ? undefined : './.kv');
+
 const session = new Session({
   loginFile: isUsingDenoDeploy ? null : '.login',
 });
+
 const ubisoft = new UbisoftClient({
   applicationId: UbisoftApplication.Trackmania,
   email: Deno.env.get('UBI_EMAIL')!,
   password: Deno.env.get('UBI_PW')!,
   onFetch: logFetchRequest,
 });
+
 const trackmania = new TrackmaniaClient({
   onFetch: logFetchRequest,
 });
+
 const discordRecordUpdate = new DiscordWebhook({
-  url: Deno.env.get('DISCORD_WEBHOOK_RECORD_UPDATE')!,
   messageBuilder: DiscordWebhook.buildRecordMessage,
   onFetch: logFetchRequest,
 });
+
 const discordCampaignUpdate = new DiscordWebhook({
-  url: Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
-  optimizeDataUsage: true,
   messageBuilder: DiscordWebhook.buildRankingsMessage,
   onFetch: logFetchRequest,
 });
+
+const webhookRecordUpdateUrl = Deno.env.get('DISCORD_WEBHOOK_RECORD_UPDATE')!;
+let discordCampaignUpdateCache: string | undefined = '';
+
 const nameResolver = new NameResolver(
   new TrackmaniaOAuthClient({
     id: Deno.env.get('TRACKMANIA_CLIENT_ID')!,
     secret: Deno.env.get('TRACKMANIA_CLIENT_SECRET')!,
   }),
 );
-
-const getClubData = () => {
-  const clubId = Deno.env.get('CLUB_ID')!;
-  const clubCampaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
-  const isClubCampaignRegex = clubCampaignName.at(0) === '/' && clubCampaignName.at(-1) === '/';
-  const clubCampaignNameRegex = isClubCampaignRegex ? new RegExp(clubCampaignName.slice(1, -1)) : null;
-  const latestCampaignOrByName = clubCampaignName === 'latest'
-    ? (activity: ClubActivity) => activity.activityType === 'campaign'
-    : clubCampaignNameRegex
-    ? (activity: ClubActivity) => activity.activityType === 'campaign' && clubCampaignNameRegex.test(activity.name)
-    : (activity: ClubActivity) => activity.activityType === 'campaign' && activity.name === clubCampaignName;
-
-  return { clubId, clubCampaignName, latestCampaignOrByName };
-};
 
 const replayStoragePath = Deno.env.get('REPLAY_STORAGE_PATH')!;
 if (replayStoragePath !== 'none') {
@@ -84,20 +80,17 @@ await session.restore(ubisoft, trackmania);
 interface Context {
   trackmania: TrackmaniaClient;
   zones: Zones;
-  clubId: string;
-  clubCampaignName: string;
-  latestCampaignOrByName: (activity: ClubActivity) => boolean;
 }
 
 const update = async () => {
   try {
     const newUbisoftLogin = await ubisoft.login();
-    const newNadeoLogin = await trackmania.login(ubisoft.loginData!.ticket);
+    const newTrackmaniaLogin = await trackmania.login(ubisoft.loginData!.ticket);
     const newTrackmaniaNadeoLogin = await trackmania.loginNadeo(Audiences.NadeoLiveServices);
 
-    logger.info({ newUbisoftLogin, newNadeoLogin, newTrackmaniaNadeoLogin });
+    logger.info({ newUbisoftLogin, newTrackmaniaLogin, newTrackmaniaNadeoLogin });
 
-    if (newUbisoftLogin || newNadeoLogin || newTrackmaniaNadeoLogin) {
+    if (newUbisoftLogin || newTrackmaniaLogin || newTrackmaniaNadeoLogin) {
       await session.save(ubisoft, trackmania);
     }
 
@@ -117,10 +110,9 @@ const update = async () => {
     const context: Context = {
       trackmania,
       zones,
-      ...getClubData(),
     };
 
-    await updateCampaign(context);
+    await updateClub(context);
   } catch (err) {
     logger.error(err);
   }
@@ -138,88 +130,159 @@ const fromAsync = async <T, U>(
   return result;
 };
 
-const updateCampaign = async (ctx: Context) => {
-  const activity = await ctx.trackmania.clubActivity(ctx.clubId);
+const createActivityMatcher = (clubCampaignName: string, clubCampaignNameRegex: RegExp | string | null) =>
+  clubCampaignName === 'latest'
+    ? (activity: ClubActivity) => activity.activityType === 'campaign'
+    : clubCampaignNameRegex instanceof RegExp
+    ? (activity: ClubActivity) => activity.activityType === 'campaign' && clubCampaignNameRegex.test(activity.name)
+    : (activity: ClubActivity) => activity.activityType === 'campaign' && activity.name === clubCampaignName;
 
-  const latestCampaignActivity = activity.activityList.find(ctx.latestCampaignOrByName);
-  if (!latestCampaignActivity) {
-    logger.warning(`Campaign "${ctx.clubCampaignName}" not found.`);
-    return;
+const updateClub = async (ctx: Context) => {
+  if (isUsingSingleClubMode) {
+    const clubId = Deno.env.get('CLUB_ID')!;
+    const campaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
+    const isCampaignRegex = campaignName.at(0) === '/' && campaignName.at(-1) === '/';
+    const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice(1, -1)) : null;
+    const matchActivity = createActivityMatcher(campaignName, campaignNameRegex);
+
+    const activity = await ctx.trackmania.clubActivity(clubId);
+
+    const latestCampaignActivity = activity.activityList.find(matchActivity);
+    if (!latestCampaignActivity) {
+      logger.warning(`No match for campaign "${campaignName}" of club ${clubId}.`);
+      return;
+    }
+
+    if (webhookRecordUpdateUrl === 'none') {
+      logger.warning(`CLUB_ID is set but DISCORD_WEBHOOK_RECORD_UPDATE cannot be "none".`);
+      return;
+    }
+
+    const result = await updateCampaign(ctx, clubId, latestCampaignActivity.campaignId, webhookRecordUpdateUrl);
+    if (result) {
+      const [campaign, trackWrs, trackHistory] = result;
+      await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory);
+    }
+  } else {
+    for await (const webhook of kv.list<UpdateWebhook>({ prefix: ['webhook_updates'] })) {
+      try {
+        const campaignName = webhook.value.name;
+        const isCampaignRegex = campaignName.startsWith('regex:');
+        const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice('regex:'.length)) : campaignName;
+        const matchActivity = createActivityMatcher(campaignName, campaignNameRegex);
+
+        const activity = await ctx.trackmania.clubActivity(webhook.value.club_id.toString());
+
+        const campaignActivities = campaignName === 'latest'
+          ? [activity.activityList.find(matchActivity)].filter(Boolean) as ClubActivity[]
+          : activity.activityList.filter(matchActivity);
+
+        if (!campaignActivities.length) {
+          logger.warning(
+            `No match for campaign "${campaignName}" of club ${webhook.value.club_id} : (id: ${webhook.value.id}).`,
+          );
+          return;
+        }
+
+        for (const campaignActivity of campaignActivities) {
+          const result = await updateCampaign(
+            ctx,
+            webhook.value.club_id.toString(),
+            campaignActivity.campaignId,
+            webhook.value.webhook_url,
+          );
+
+          if (result) {
+            const [campaign, trackWrs, trackHistory] = result;
+            await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory, webhook);
+          }
+        }
+      } catch (err) {
+        logger.error(err);
+      }
+    }
+  }
+};
+
+const updateCampaign = async (
+  ctx: Context,
+  clubId: string,
+  campaignId: string,
+  webhookUrl: string,
+): Promise<
+  [campaign: Campaign, trackWrs: Map<string, TrackRecord[]>, trackHistory: Map<string, TrackRecord[]>] | false
+> => {
+  const clubCampaign = await ctx.trackmania.clubCampaign(clubId, campaignId);
+  const { seasonUid, name, playlist, startTimestamp, endTimestamp } = clubCampaign.campaign;
+
+  const campaignKey = ['campaigns', seasonUid];
+  let campaign = (await kv.get<Campaign>(campaignKey)).value;
+
+  const tracks = campaign
+    ? await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
+    : [];
+
+  if (!campaign) {
+    const result = await kv.set(campaignKey, {
+      uid: seasonUid,
+      name,
+      event: {
+        startsAt: startTimestamp,
+        endsAt: endTimestamp,
+      },
+    });
+
+    if (result.ok) {
+      campaign = (await kv.get<Campaign>(campaignKey)).value;
+    }
   }
 
-  const { campaign } = await ctx.trackmania.clubCampaign(ctx.clubId, latestCampaignActivity.campaignId);
-  const campaigns = [campaign];
+  if (!campaign) {
+    logger.warning(`Failed to find or create campaign ${name}.`);
+    return false;
+  }
 
-  for (const { seasonUid, name, playlist, startTimestamp, endTimestamp } of campaigns) {
-    const campaignKey = ['campaigns', seasonUid];
-    let campaign = (await kv.get<Campaign>(campaignKey)).value;
+  let updates = 0;
 
-    const tracks = campaign
-      ? await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
-      : [];
+  const maps = await ctx.trackmania.maps(playlist.map((map) => map.mapUid));
 
-    if (!campaign) {
-      const result = await kv.set(campaignKey, {
-        uid: seasonUid,
+  const trackWrs = new Map<string, TrackRecord[]>();
+  const trackHistory = new Map<string, TrackRecord[]>();
+
+  for (const { mapUid } of playlist) {
+    const { name, mapId, thumbnailUrl } = maps.find((map) => map.mapUid === mapUid);
+    logger.info(name, mapUid);
+
+    let track = tracks.find((track) => track.uid === mapUid) ?? null;
+    if (!track) {
+      const trackKey = ['tracks', campaign.uid, mapUid];
+
+      const result = await kv.set(trackKey, {
+        campaign_uid: campaign.uid,
+        uid: mapUid,
+        id: mapId,
         name,
-        event: {
-          startsAt: startTimestamp,
-          endsAt: endTimestamp,
-        },
+        thumbnail: thumbnailUrl.slice(thumbnailUrl.lastIndexOf('/') + 1, -4),
       });
 
       if (result.ok) {
-        campaign = (await kv.get<Campaign>(campaignKey)).value;
+        track = (await kv.get<Track>(trackKey)).value;
       }
     }
 
-    if (!campaign) {
-      logger.warning(`Failed to find or create campaign ${name}`);
+    if (!track) {
+      logger.warning(`Failed to find or create track ${name}.`);
       continue;
     }
 
-    let updates = 0;
+    const [wrs, history, newUpdates] = await updateRecords(ctx, campaign, track, mapId, webhookUrl);
 
-    const maps = await ctx.trackmania.maps(playlist.map((map) => map.mapUid));
-
-    const trackWrs = new Map<string, TrackRecord[]>();
-    const trackHistory = new Map<string, TrackRecord[]>();
-
-    for (const { mapUid } of playlist) {
-      const { name, mapId, thumbnailUrl } = maps.find((map) => map.mapUid === mapUid);
-      logger.info(name, mapUid);
-
-      let track = tracks.find((track) => track.uid === mapUid) ?? null;
-      if (!track) {
-        const trackKey = ['tracks', campaign.uid, mapUid];
-
-        const result = await kv.set(trackKey, {
-          campaign_uid: campaign.uid,
-          uid: mapUid,
-          id: mapId,
-          name,
-          thumbnail: thumbnailUrl.slice(thumbnailUrl.lastIndexOf('/') + 1, -4),
-        });
-
-        if (result.ok) {
-          track = (await kv.get<Track>(trackKey)).value;
-        }
-      }
-
-      if (!track) {
-        logger.warning(`Failed to find or create track ${name}`);
-        continue;
-      }
-
-      const [wrs, history, newUpdates] = await updateRecords(ctx, campaign, track, mapId);
-
-      trackWrs.set(track.uid, wrs);
-      trackHistory.set(track.uid, history);
-      updates += newUpdates;
-    }
-
-    await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory);
+    trackWrs.set(track.uid, wrs);
+    trackHistory.set(track.uid, history);
+    updates += newUpdates;
   }
+
+  return [campaign, trackWrs, trackHistory];
 };
 
 const updateRecords = async (
@@ -227,6 +290,7 @@ const updateRecords = async (
   campaign: Campaign,
   track: Track,
   mapId: string,
+  webhookUrl: string,
 ): Promise<[wrs: TrackRecord[], history: TrackRecord[], updates: number]> => {
   const worldLeaderboard = (await ctx.trackmania.leaderboard(campaign.uid, track.uid, 0, 5)).tops.at(0);
 
@@ -244,7 +308,7 @@ const updateRecords = async (
 
       const [record] = await ctx.trackmania.mapRecords([accountId], [mapId]);
       if (!record) {
-        logger.error(`Failed to retrieve map record from ${accountId} on ${mapId}`);
+        logger.error(`Failed to retrieve map record from ${accountId} on ${mapId}.`);
         continue;
       }
 
@@ -269,7 +333,7 @@ const updateRecords = async (
       const result = await kv.atomic()
         .check({ key, versionstamp: null })
         .set(key, wr)
-        .enqueue({ type: 'wr', wr, track, campaign })
+        .enqueue({ type: 'wr', wr, track, campaign, webhookUrl } satisfies WrQueueMessage)
         .commit();
 
       if (result.ok) {
@@ -297,6 +361,7 @@ const sendCampaignUpdate = async (
   campaign: Campaign,
   trackWrs: Map<string, TrackRecord[]>,
   trackHistory: Map<string, TrackRecord[]>,
+  webhook?: Deno.KvEntry<UpdateWebhook>,
 ) => {
   try {
     const topWorldRankings = (await ctx.trackmania.leaderboard(campaign.uid, undefined, 0, 5)).tops?.at(0)?.top ?? [];
@@ -324,25 +389,66 @@ const sendCampaignUpdate = async (
       stats: generateStats(ctx.zones, trackWrs, trackHistory),
     };
 
-    const messageId = Deno.env.get('DISCORD_CAMPAIGN_UPDATE_MESSAGE_ID')!;
-    if (messageId !== 'fixme') {
-      await discordCampaignUpdate.edit(messageId, data);
+    if (isUsingSingleClubMode) {
+      const messageId = Deno.env.get('DISCORD_CAMPAIGN_UPDATE_MESSAGE_ID')!;
+      switch (messageId) {
+        case 'fixme': {
+          discordCampaignUpdateCache = await discordCampaignUpdate.edit(
+            Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
+            messageId,
+            data,
+            discordCampaignUpdateCache,
+          );
+          break;
+        }
+        default: {
+          discordCampaignUpdateCache = await discordCampaignUpdate.send(
+            Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
+            data,
+          );
+          break;
+        }
+      }
     } else {
-      await discordCampaignUpdate.send(data);
+      const body = await discordCampaignUpdate.edit(
+        webhook!.value.ranking_webhook_url,
+        webhook!.value.ranking_message_id.toString(),
+        data,
+        webhook!.value.ranking_message_cache,
+      );
+
+      if (body) {
+        webhook!.value.ranking_message_cache = body;
+
+        await db.atomic()
+          .check(webhook!)
+          .set(webhook!.key, webhook!.value)
+          .commit();
+      }
     }
   } catch (err) {
     logger.error(err);
   }
 };
 
+type WrQueueMessage = {
+  type: 'wr';
+  wr: TrackRecord;
+  track: Track;
+  campaign: Campaign;
+  webhookUrl: string;
+};
+
+type QueueMessages = WrQueueMessage;
+
 kv.listenQueue(async (message) => {
-  const { type, wr, track, campaign } = message as { type: 'wr'; wr: TrackRecord; track: Track; campaign: Campaign };
+  const { type, wr, track, campaign, webhookUrl } = message as QueueMessages;
 
   switch (type) {
     case 'wr': {
       try {
         logger.info('NEW RECORD', wr.user.name, wr.score);
-        await discordRecordUpdate.send({ wr, track });
+        await discordRecordUpdate.send(webhookUrl, { wr, track });
       } catch (err) {
         logger.error(err);
       }
@@ -382,7 +488,7 @@ kv.listenQueue(async (message) => {
   flushFileLogger();
 });
 
-Deno.cron('Update', '*/1 * * * *', async () => {
+Deno.cron('Update', '*/1 * * * *', { backoffSchedule: [30_000] }, async () => {
   logger.info('Updating');
   await update();
   flushFileLogger();

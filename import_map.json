@@ -4,6 +4,7 @@
     "testing/": "https://deno.land/std@0.207.0/testing/",
     "log/": "https://deno.land/std@0.207.0/log/",
     "path/": "https://deno.land/std@0.207.0/path/",
+    "@discordeno/bot": "npm:@discordeno/bot@19.0.0-next.1974834",
     "country-flag-emoji": "https://esm.sh/v135/country-flag-emoji@1.0.3"
   }
 }
