@@ -140,7 +140,7 @@ export class TrackmaniaClient {
       }
 
       const refreshPayload = this.#parseJwtToken(this.loginData.refreshToken);
-      if (new Date(refreshPayload.exp * 1_000) > new Date()) {
+      if (new Date(refreshPayload.exp * 1_000) < new Date()) {
         await this.refresh();
         return true;
       }
@@ -181,7 +181,7 @@ export class TrackmaniaClient {
       }
 
       const refreshPayload = this.#parseJwtToken(this.loginDataNadeo.refreshToken);
-      if (new Date(refreshPayload.exp * 1_000) > new Date()) {
+      if (new Date(refreshPayload.exp * 1_000) < new Date()) {
         await this.refreshNadeo();
         return true;
       }
