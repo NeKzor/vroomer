@@ -4,6 +4,7 @@
 .kv-shm
 .kv-wal
 .login
+replays/
 
 node_modules/
 coverage/

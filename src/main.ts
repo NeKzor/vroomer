@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { load } from 'dotenv/mod.ts';
+import { join } from 'path/mod.ts';
 import { Temporal } from '@js-temporal/polyfill';
 import { Audiences, ClubActivity, TrackmaniaClient, TrackmaniaOAuthClient, UbisoftClient, Zone, Zones } from './api.ts';
 import { DiscordWebhook } from './discord.ts';
@@ -106,6 +107,7 @@ const discordCampaignUpdate = new DiscordWebhook({
   messageBuilder: DiscordWebhook.buildRankingsMessage,
 });
 
+const replayStoragePath = Deno.env.get('REPLAY_STORAGE_PATH')!;
 const clubId = Deno.env.get('CLUB_ID')!;
 const clubCampaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
 const isClubCampaignRegex = clubCampaignName.at(0) === '/' && clubCampaignName.at(-1) === '/';
@@ -115,6 +117,14 @@ const latestCampaignOrByName = clubCampaignName === 'latest'
   : clubCampaignNameRegex
   ? (activity: ClubActivity) => activity.activityType === 'campaign' && clubCampaignNameRegex.test(activity.name)
   : (activity: ClubActivity) => activity.activityType === 'campaign' && activity.name === clubCampaignName;
+
+if (replayStoragePath !== 'none') {
+  const { state } = await Deno.permissions.query({ name: 'write', path: replayStoragePath });
+  if (state !== 'granted') {
+    logger.error('Write permission to replay storage path is required!', { replayStoragePath, state });
+    Deno.exit(1);
+  }
+}
 
 interface Context {
   trackmania: TrackmaniaClient;
@@ -308,7 +318,7 @@ const updateRecords = async (
       const result = await kv.atomic()
         .check({ key, versionstamp: null })
         .set(key, wr)
-        .enqueue({ type: 'wr', wr, track })
+        .enqueue({ type: 'wr', wr, track, campaign })
         .commit();
 
       if (result.ok) {
@@ -375,7 +385,7 @@ const sendCampaignUpdate = async (
 };
 
 kv.listenQueue(async (message) => {
-  const { type, wr, track } = message as { type: 'wr'; wr: TrackRecord; track: Track };
+  const { type, wr, track, campaign } = message as { type: 'wr'; wr: TrackRecord; track: Track; campaign: Campaign };
 
   switch (type) {
     case 'wr': {
@@ -384,6 +394,29 @@ kv.listenQueue(async (message) => {
         await discordRecordUpdate.send({ wr, track });
       } catch (err) {
         logger.error(err);
+      }
+
+      if (replayStoragePath !== 'none') {
+        let file: Deno.FsFile | undefined;
+        try {
+          const folderPath = join(replayStoragePath, campaign.uid, track.uid);
+          await Deno.mkdir(folderPath, { recursive: true });
+
+          const fileName = [track.name, wr.score, wr.user.name, wr.uid]
+            .join('_')
+            .replaceAll(/[\\/ ]/g, '_') + '.replay.gbx';
+
+          file = await Deno.open(join(folderPath, fileName), { write: true, createNew: true });
+          const res = await fetch(`https://prod.trackmania.core.nadeo.online/storageObjects/${wr.uid}`);
+          await res.body?.pipeTo(file.writable);
+        } catch (err) {
+          logger.error(err);
+        } finally {
+          try {
+            file?.close();
+            // deno-lint-ignore no-empty
+          } catch {}
+        }
       }
       break;
     }

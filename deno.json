@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "dev": "deno run --unstable-kv --unstable-cron --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com --watch src/main.ts",
-    "update": "deno run --no-prompt --unstable-kv --unstable-cron --allow-env --allow-read=./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com src/main.ts",
+    "dev": "deno run --unstable-kv --unstable-cron --allow-env --allow-read=./replays,./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./replays,./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com,trackmania-prod-storage-map-record.s3.eu-west-1.amazonaws.com --watch src/main.ts",
+    "update": "deno run --no-prompt --unstable-kv --unstable-cron --allow-env --allow-read=./replays,./.kv,./logs,.login,.env,.env.defaults,.env.example --allow-write=./replays,./.kv,./logs,.login --allow-net=public-ubiservices.ubi.com,prod.trackmania.core.nadeo.online,live-services.trackmania.nadeo.live,api.trackmania.com,discord.com,trackmania-prod-storage-map-record.s3.eu-west-1.amazonaws.com src/main.ts",
     "check": "deno fmt --check && deno lint && deno task check:types",
     "check:types": "deno check --unstable-kv --no-lock src/**/*.ts"
   },
