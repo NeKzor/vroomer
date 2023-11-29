@@ -173,29 +173,24 @@ const updateClub = async (ctx: Context) => {
 
         const activity = await ctx.trackmania.clubActivity(webhook.value.club_id.toString());
 
-        const campaignActivities = campaignName === 'latest'
-          ? [activity.activityList.find(matchActivity)].filter(Boolean) as ClubActivity[]
-          : activity.activityList.filter(matchActivity);
-
-        if (!campaignActivities.length) {
+        const campaignActivity = activity.activityList.find(matchActivity);
+        if (!campaignActivity) {
           logger.warning(
             `No match for campaign "${campaignName}" of club ${webhook.value.club_id} : (id: ${webhook.value.id}).`,
           );
           return;
         }
 
-        for (const campaignActivity of campaignActivities) {
-          const result = await updateCampaign(
-            ctx,
-            webhook.value.club_id.toString(),
-            campaignActivity.campaignId,
-            webhook.value.webhook_url,
-          );
+        const result = await updateCampaign(
+          ctx,
+          webhook.value.club_id.toString(),
+          campaignActivity.campaignId,
+          webhook.value.webhook_url,
+        );
 
-          if (result) {
-            const [campaign, trackWrs, trackHistory] = result;
-            await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory, webhook);
-          }
+        if (result) {
+          const [campaign, trackWrs, trackHistory] = result;
+          await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory, webhook);
         }
       } catch (err) {
         logger.error(err);
