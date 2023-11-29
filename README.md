@@ -42,6 +42,7 @@ Campaign world record updates for your Trackmania club!
 - Record updates are scheduled every minute as long as the `deno task update` process runs.
 - Ranking updates are only send when there is a change.
 - Running in bot mode is optional but obviously cannot run on Deno Deploy.
+- Multiple servers are not supported.
 
 ## License
 
