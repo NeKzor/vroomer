@@ -40,4 +40,8 @@ export const flushFileLogger = () => {
   fileHandler?.flush();
 };
 
+export const logFetchRequest = ({ method, url, res }: { method: string; url: string; res: Response }) => {
+  logger.info(`[${method}] ${url} : ${res.status}`);
+};
+
 export const logger = log.getLogger();

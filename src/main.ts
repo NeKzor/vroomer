@@ -7,17 +7,18 @@ import {
   Audiences,
   ClubActivity,
   TrackmaniaClient,
-  TrackmaniaClientToken,
   TrackmaniaOAuthClient,
+  UbisoftApplication,
   UbisoftClient,
-  UbisoftClientSession,
   Zone,
   Zones,
 } from './api.ts';
 import { DiscordWebhook } from './discord.ts';
-import { flushFileLogger, logger } from './logger.ts';
+import { flushFileLogger, logFetchRequest, logger } from './logger.ts';
 import { Campaign, Track, TrackRecord } from './models.ts';
 import { generateStats } from './stats.ts';
+import { NameResolver } from './resolver.ts';
+import { Session } from './session.ts';
 
 const isUsingDenoDeploy = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined;
 if (!isUsingDenoDeploy) {
@@ -25,102 +26,11 @@ if (!isUsingDenoDeploy) {
 }
 
 const kv = await Deno.openKv(isUsingDenoDeploy ? undefined : './.kv');
-
-const session = {
-  file: '.login',
-  ubisoft: {
-    loginData: null as UbisoftClientSession | null,
-  },
-  trackmania: {
-    loginData: null as TrackmaniaClientToken | null,
-    loginDataNadeo: null as TrackmaniaClientToken | null,
-  },
-
-  async restore(ubisoft: UbisoftClient, trackmania: TrackmaniaClient) {
-    if (!isUsingDenoDeploy) {
-      try {
-        const login = JSON.parse(await Deno.readTextFile(this.file));
-        ubisoft.loginData = login.ubisoft.loginData;
-        trackmania.loginData = login.trackmania.loginData;
-        trackmania.loginDataNadeo = login.trackmania.loginDataNadeo;
-      } catch (err) {
-        if (err instanceof Deno.errors.NotFound) {
-          return;
-        }
-        logger.error(err);
-      }
-      logger.info('Restored session');
-    }
-  },
-
-  async save(ubisoft: UbisoftClient, trackmania: TrackmaniaClient) {
-    if (isUsingDenoDeploy) {
-      this.ubisoft.loginData = ubisoft.loginData;
-      this.ubisoft.loginData = ubisoft.loginData;
-      this.trackmania.loginData = trackmania.loginData;
-      this.trackmania.loginDataNadeo = trackmania.loginDataNadeo;
-    } else {
-      await Deno.writeTextFile(
-        this.file,
-        JSON.stringify({
-          ubisoft: {
-            loginData: ubisoft.loginData,
-          },
-          trackmania: {
-            loginData: trackmania.loginData,
-            loginDataNadeo: trackmania.loginDataNadeo,
-          },
-        }),
-      );
-    }
-    logger.info('Saved session');
-  },
-};
-
-const nameResolver = {
-  cache: new Map<string, string>(),
-
-  async get(accountId: string) {
-    let name = this.cache.get(accountId);
-    if (name !== undefined) {
-      return name;
-    }
-
-    const displayNames = await oauthClient.displayNames([accountId]);
-    name = displayNames[accountId] ?? '';
-    this.cache.set(accountId, name);
-    return name;
-  },
-  async downloadAll(accountIds: string[]) {
-    if (accountIds.length === 0) {
-      return;
-    }
-
-    const names = accountIds
-      .map((accountId) => [accountId, this.cache.get(accountId)]) as [string, string | undefined][];
-
-    const toResolve = names
-      .filter(([_, name]) => name === undefined)
-      .map(([accountId]) => accountId);
-
-    if (toResolve.length === 0) {
-      return;
-    }
-
-    const displayNames = await oauthClient.displayNames(toResolve);
-    toResolve.forEach((accountId) => {
-      const name = displayNames[accountId] ?? '';
-      this.cache.set(accountId, name);
-      return name;
-    });
-  },
-};
-
-const logFetchRequest = ({ method, url, res }: { method: string; url: string; res: Response }) => {
-  logger.info(`[${method}] ${url} : ${res.status}`);
-};
-
+const session = new Session({
+  loginFile: isUsingDenoDeploy ? null : '.login',
+});
 const ubisoft = new UbisoftClient({
+  applicationId: UbisoftApplication.Trackmania,
   email: Deno.env.get('UBI_EMAIL')!,
   password: Deno.env.get('UBI_PW')!,
   onFetch: logFetchRequest,
@@ -139,22 +49,28 @@ const discordCampaignUpdate = new DiscordWebhook({
   messageBuilder: DiscordWebhook.buildRankingsMessage,
   onFetch: logFetchRequest,
 });
-const oauthClient = new TrackmaniaOAuthClient({
-  id: Deno.env.get('TRACKMANIA_CLIENT_ID')!,
-  secret: Deno.env.get('TRACKMANIA_CLIENT_SECRET')!,
-});
+const nameResolver = new NameResolver(
+  new TrackmaniaOAuthClient({
+    id: Deno.env.get('TRACKMANIA_CLIENT_ID')!,
+    secret: Deno.env.get('TRACKMANIA_CLIENT_SECRET')!,
+  }),
+);
+
+const getClubData = () => {
+  const clubId = Deno.env.get('CLUB_ID')!;
+  const clubCampaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
+  const isClubCampaignRegex = clubCampaignName.at(0) === '/' && clubCampaignName.at(-1) === '/';
+  const clubCampaignNameRegex = isClubCampaignRegex ? new RegExp(clubCampaignName.slice(1, -1)) : null;
+  const latestCampaignOrByName = clubCampaignName === 'latest'
+    ? (activity: ClubActivity) => activity.activityType === 'campaign'
+    : clubCampaignNameRegex
+    ? (activity: ClubActivity) => activity.activityType === 'campaign' && clubCampaignNameRegex.test(activity.name)
+    : (activity: ClubActivity) => activity.activityType === 'campaign' && activity.name === clubCampaignName;
+
+  return { clubId, clubCampaignName, latestCampaignOrByName };
+};
 
 const replayStoragePath = Deno.env.get('REPLAY_STORAGE_PATH')!;
-const clubId = Deno.env.get('CLUB_ID')!;
-const clubCampaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
-const isClubCampaignRegex = clubCampaignName.at(0) === '/' && clubCampaignName.at(-1) === '/';
-const clubCampaignNameRegex = isClubCampaignRegex ? new RegExp(clubCampaignName.slice(1, -1)) : null;
-const latestCampaignOrByName = clubCampaignName === 'latest'
-  ? (activity: ClubActivity) => activity.activityType === 'campaign'
-  : clubCampaignNameRegex
-  ? (activity: ClubActivity) => activity.activityType === 'campaign' && clubCampaignNameRegex.test(activity.name)
-  : (activity: ClubActivity) => activity.activityType === 'campaign' && activity.name === clubCampaignName;
-
 if (replayStoragePath !== 'none') {
   const { state } = await Deno.permissions.query({ name: 'write', path: replayStoragePath });
   if (state !== 'granted') {
@@ -170,6 +86,7 @@ interface Context {
   zones: Zones;
   clubId: string;
   clubCampaignName: string;
+  latestCampaignOrByName: (activity: ClubActivity) => boolean;
 }
 
 const update = async () => {
@@ -200,8 +117,7 @@ const update = async () => {
     const context: Context = {
       trackmania,
       zones,
-      clubId,
-      clubCampaignName,
+      ...getClubData(),
     };
 
     await updateCampaign(context);
@@ -223,15 +139,15 @@ const fromAsync = async <T, U>(
 };
 
 const updateCampaign = async (ctx: Context) => {
-  const activity = await ctx.trackmania.clubActivity(clubId);
+  const activity = await ctx.trackmania.clubActivity(ctx.clubId);
 
-  const latestCampaignActivity = activity.activityList.find(latestCampaignOrByName);
+  const latestCampaignActivity = activity.activityList.find(ctx.latestCampaignOrByName);
   if (!latestCampaignActivity) {
     logger.warning(`Campaign "${ctx.clubCampaignName}" not found.`);
     return;
   }
 
-  const { campaign } = await ctx.trackmania.clubCampaign(clubId, latestCampaignActivity.campaignId);
+  const { campaign } = await ctx.trackmania.clubCampaign(ctx.clubId, latestCampaignActivity.campaignId);
   const campaigns = [campaign];
 
   for (const { seasonUid, name, playlist, startTimestamp, endTimestamp } of campaigns) {

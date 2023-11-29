@@ -26,8 +26,13 @@ export interface UbisoftClientSession {
   rememberMeTicket: string | null;
 }
 
+export const UbisoftApplication = {
+  Trackmania: '86263886-327a-4328-ac69-527f0d20a237',
+};
+
 export class UbisoftClient {
   baseUrl: string;
+  applicationId: string;
   loginData: UbisoftClientSession | null;
 
   onRequest?: (args: { url: string; method: string }) => void;
@@ -37,12 +42,14 @@ export class UbisoftClient {
 
   constructor(
     options: {
+      applicationId: string;
       email: string;
       password: string;
       onRequest?: (args: { url: string; method: string }) => void;
       onFetch?: (args: { url: string; method: string; res: Response }) => void;
     },
   ) {
+    this.applicationId = options.applicationId;
     this.baseUrl = 'https://public-ubiservices.ubi.com';
     this.loginData = null;
     this.onRequest = options.onRequest;
@@ -63,7 +70,7 @@ export class UbisoftClient {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Ubi-AppId': '86263886-327a-4328-ac69-527f0d20a237',
+        'Ubi-AppId': this.applicationId,
         'Authorization': 'Basic ' + this.#auth,
       },
     });
@@ -613,11 +620,17 @@ export type ClubCampaignResponse = {
   mapsCount: number;
 };
 
+export interface TrackmaniaOAuthToken {
+  token_type: string;
+  expires_in: number;
+  access_token: string;
+}
+
 export class TrackmaniaOAuthClient {
   #id: string;
   #secret: string;
 
-  loginData: any | null;
+  loginData: TrackmaniaOAuthToken | null;
 
   onRequest?: (args: { url: string; method: string }) => void;
   onFetch?: (args: { url: string; method: string; res: Response }) => void;
@@ -674,7 +687,7 @@ export class TrackmaniaOAuthClient {
       const res = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${this.loginData.access_token}`,
+          'Authorization': `Bearer ${this.loginData!.access_token}`,
         },
       });
 
