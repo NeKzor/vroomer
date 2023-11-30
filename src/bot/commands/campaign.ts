@@ -326,7 +326,7 @@ createCommand({
               await bot.helpers.editOriginalInteractionResponse(
                 interaction.token,
                 {
-                  content: `Removed updates webhook.`,
+                  content: `Removed campaign.`,
                 },
               );
             } catch (err) {
