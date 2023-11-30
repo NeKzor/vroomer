@@ -241,6 +241,8 @@ createCommand({
                     } satisfies UpdateWebhook,
                   );
 
+                Webhooks.load().catch(log.error);
+
                 await bot.helpers.editOriginalInteractionResponse(
                   interaction.token,
                   {
@@ -310,6 +312,8 @@ createCommand({
               }
 
               await db.delete(['webhook_updates', webhook.club_id, webhook.name]);
+
+              Webhooks.load().catch(log.error);
 
               try {
                 await bot.helpers.deleteWebhook(webhook.webhook_id);
