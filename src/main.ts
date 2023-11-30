@@ -252,25 +252,25 @@ const updateCampaign = async (
     logger.info(name, mapUid);
 
     let track = tracks.find((track) => track.uid === mapUid) ?? null;
-    //if (!track) {
-    const trackKey = ['tracks', campaign.uid, mapUid];
+    if (!track) {
+      const trackKey = ['tracks', campaign.uid, mapUid];
 
-    const result = await kv.set(
-      trackKey,
-      {
-        campaign_uid: campaign.uid,
-        uid: mapUid,
-        id: mapId,
-        position,
-        name,
-        thumbnail: thumbnailUrl.slice(thumbnailUrl.lastIndexOf('/') + 1, -4),
-      } satisfies Track,
-    );
+      const result = await kv.set(
+        trackKey,
+        {
+          campaign_uid: campaign.uid,
+          uid: mapUid,
+          id: mapId,
+          position,
+          name,
+          thumbnail: thumbnailUrl.slice(thumbnailUrl.lastIndexOf('/') + 1, -4),
+        } satisfies Track,
+      );
 
-    if (result.ok) {
-      track = (await kv.get<Track>(trackKey)).value;
+      if (result.ok) {
+        track = (await kv.get<Track>(trackKey)).value;
+      }
     }
-    //}
 
     if (!track) {
       logger.warning(`Failed to find or create track ${name}.`);
