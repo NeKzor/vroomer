@@ -6,11 +6,11 @@ import {
   ApplicationCommandOptionTypes,
   ApplicationCommandTypes,
   Bot,
+  encode,
   Interaction,
   InteractionResponseTypes,
   InteractionTypes,
   MessageFlags,
-  encode,
 } from '@discordeno/bot';
 import { createCommand } from './mod.ts';
 import { log } from '../utils/logger.ts';
