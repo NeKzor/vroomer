@@ -10,6 +10,7 @@ import {
   InteractionResponseTypes,
   InteractionTypes,
   MessageFlags,
+  encode,
 } from '@discordeno/bot';
 import { createCommand } from './mod.ts';
 import { log } from '../utils/logger.ts';
@@ -206,7 +207,13 @@ createCommand({
                   },
                 );
               } else {
-                const rankingWebhook = await bot.helpers.createWebhook(rankingChannelId, { name: 'Trackmania' });
+                const avatar = `data:image/jpeg;base64,${encode(await Deno.readFile('./avatar.jpg'))}`;
+
+                const rankingWebhook = await bot.helpers.createWebhook(rankingChannelId, {
+                  name: 'Trackmania',
+                  avatar,
+                });
+
                 const rankingMessage = await bot.helpers.executeWebhook(rankingWebhook.id, rankingWebhook.token!, {
                   content: 'Ranking update...',
                   wait: true,
@@ -222,7 +229,10 @@ createCommand({
                   return;
                 }
 
-                const webhook = await bot.helpers.createWebhook(channelId, { name: 'Trackmania' });
+                const webhook = await bot.helpers.createWebhook(channelId, {
+                  name: 'Trackmania',
+                  avatar,
+                });
 
                 await db
                   .set(
