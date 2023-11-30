@@ -374,7 +374,7 @@ const sendCampaignUpdate = async (
     const data = {
       campaign,
       tracks: await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
-      records: await fromAsync(kv.list<TrackRecord>({ prefix: ['records', campaign.uid] }), ({ value }) => value),
+      records: Array.from(trackWrs.values()).flat(),
       rankings: topWorldRankings.map((ranking) => {
         return {
           user: {
