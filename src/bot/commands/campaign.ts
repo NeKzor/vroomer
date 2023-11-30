@@ -36,13 +36,13 @@ createCommand({
       options: [
         {
           name: 'club_id',
-          description: 'Club ID.',
+          description: 'Club ID. Can be found on trackmania.io.',
           type: ApplicationCommandOptionTypes.Number,
           required: true,
         },
         {
           name: 'name',
-          description: 'Campaign name.',
+          description: 'Campaign name. Advanced patterns are possible too e.g. "regex:^(Winter|Spring|Summer|Fall)"',
           type: ApplicationCommandOptionTypes.String,
           required: true,
         },
@@ -54,7 +54,7 @@ createCommand({
         },
         {
           name: 'update_channel',
-          description: 'Channel which should receive record updates.',
+          description: 'Channel which should receive record updates. Defaults to the current channel.',
           type: ApplicationCommandOptionTypes.Channel,
         },
       ],
@@ -66,7 +66,7 @@ createCommand({
       options: [
         {
           name: 'query',
-          description: 'The webhook to remove.',
+          description: 'The name of the campaign to remove.',
           type: ApplicationCommandOptionTypes.String,
           autocomplete: true,
           required: true,
@@ -75,7 +75,7 @@ createCommand({
     },
     {
       name: 'list',
-      description: 'Remove campaign updates.',
+      description: 'List campaign updates.',
       type: ApplicationCommandOptionTypes.SubCommand,
     },
   ],
@@ -87,7 +87,7 @@ createCommand({
         {
           type: InteractionResponseTypes.ChannelMessageWithSource,
           data: {
-            content: `❌️ You do not have the permissions to use this command.`,
+            content: `❌️ You do not have permissions to use this command.`,
             flags: MessageFlags.Ephemeral,
           },
         },
@@ -151,7 +151,7 @@ createCommand({
                 {
                   type: InteractionResponseTypes.ChannelMessageWithSource,
                   data: {
-                    content: `Setting updates...`,
+                    content: `Adding campaign...`,
                     flags: MessageFlags.Ephemeral,
                   },
                 },
@@ -188,7 +188,7 @@ createCommand({
                   await bot.helpers.editOriginalInteractionResponse(
                     interaction.token,
                     {
-                      content: `❌️ Webhook already set for this channel.`,
+                      content: `❌️ This channel already receives campaign updates with the exact campaign name.`,
                     },
                   );
                   return;
@@ -202,7 +202,7 @@ createCommand({
                 await bot.helpers.editOriginalInteractionResponse(
                   interaction.token,
                   {
-                    content: `Moved existing webhook from <#${webhook.channelId}> to this channel.`,
+                    content: `Moved campaign updates from <#${webhook.channelId}> to <#${channelId}>.`,
                   },
                 );
               } else {
@@ -216,7 +216,7 @@ createCommand({
                   await bot.helpers.editOriginalInteractionResponse(
                     interaction.token,
                     {
-                      content: `❌️ Failed to execute initial webhook message for ranking update.`,
+                      content: `❌️ Failed to send initial ranking update message.`,
                     },
                   );
                   return;
@@ -244,7 +244,7 @@ createCommand({
                 await bot.helpers.editOriginalInteractionResponse(
                   interaction.token,
                   {
-                    content: `Created webhook. New updates will be sent automatically to this channel.`,
+                    content: `Added campaign. New updates will be sent automatically to this channel.`,
                   },
                 );
               }
@@ -254,7 +254,7 @@ createCommand({
               await bot.helpers.editOriginalInteractionResponse(
                 interaction.token,
                 {
-                  content: `❌️ Failed to set updates.`,
+                  content: `❌️ Failed to add campaign.`,
                 },
               );
             }
@@ -268,7 +268,7 @@ createCommand({
                 {
                   type: InteractionResponseTypes.ChannelMessageWithSource,
                   data: {
-                    content: `Removing updates...`,
+                    content: `Removing campaign...`,
                     flags: MessageFlags.Ephemeral,
                   },
                 },
@@ -286,7 +286,7 @@ createCommand({
                   {
                     type: InteractionResponseTypes.ChannelMessageWithSource,
                     data: {
-                      content: `❌️ Rankings webhook not found.`,
+                      content: `❌️ Campaign not found.`,
                       flags: MessageFlags.Ephemeral,
                     },
                   },
@@ -335,7 +335,7 @@ createCommand({
               await bot.helpers.editOriginalInteractionResponse(
                 interaction.token,
                 {
-                  content: `❌️ Failed to remove updates.`,
+                  content: `❌️ Failed to remove campaign.`,
                 },
               );
             }
