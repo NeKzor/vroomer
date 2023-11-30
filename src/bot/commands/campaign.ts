@@ -369,10 +369,19 @@ createCommand({
                 },
               );
 
+              const guildWebhooks = await bot.helpers.getGuildWebhooks(interaction.guildId!);
               const webhooks: string[] = [];
 
               for await (const { value: webhook } of db.list<UpdateWebhook>({ prefix: ['webhook_updates'] })) {
-                webhooks.push(`${webhook.name} (Club ID: ${webhook.club_id})`);
+                const updateWebhook = guildWebhooks.find(({ url }) => url === webhook.webhook_url);
+                const rankingWebhook = guildWebhooks.find(({ url }) => url === webhook.ranking_webhook_url);
+
+                webhooks.push([
+                  webhook.name,
+                  `Club ID: ${webhook.club_id}`,
+                  `Update Channel: ${updateWebhook?.channelId ? `<#${updateWebhook.channelId}>` : '*not found*'}`,
+                  `Ranking Channel: ${rankingWebhook?.channelId ? `<#${rankingWebhook.channelId}>` : '*not found*'}`,
+                ].join(' | '));
               }
 
               await bot.helpers.editOriginalInteractionResponse(
