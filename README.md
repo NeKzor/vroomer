@@ -4,6 +4,8 @@
 
 Campaign world record updates for your Trackmania club!
 
+https://github.com/NeKzor/vroomer/assets/16884507/ce0bb832-b612-45d3-9677-f97fffbd642a
+
 ## Features
 
 - World records updates and statistics
