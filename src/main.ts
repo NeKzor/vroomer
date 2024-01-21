@@ -316,6 +316,8 @@ const updateRecords = async (
 
       const uid = record.url.slice(record.url.lastIndexOf('/') + 1);
 
+      wrScore = record.recordScore.time;
+
       const wr: TrackRecord = {
         uid,
         campaign_uid: campaign.uid,
@@ -326,8 +328,8 @@ const updateRecords = async (
           zone: ctx.zones.search(zoneId),
         },
         date: record.timestamp,
-        score,
-        delta: Math.abs(isFinite(latestScore) ? score - latestScore : 0),
+        score: wrScore,
+        delta: Math.abs(isFinite(latestScore) ? wrScore - latestScore : 0),
       };
 
       const key = ['records', campaign.uid, track.uid, wr.uid];

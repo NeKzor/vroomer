@@ -491,7 +491,7 @@ export interface MapRecord {
   gameModeCustomData: string;
   mapId: string;
   medal: string;
-  recordScore: { respawnCount: string; score: string; time: string };
+  recordScore: { respawnCount: number; score: number; time: number };
   removed: string;
   scopeId: string;
   scopeType: string;
