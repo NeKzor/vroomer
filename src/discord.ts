@@ -4,6 +4,7 @@
 import { Campaign, Track, TrackRecord } from './models.ts';
 import { Zone } from './api.ts';
 import { escapeMarkdown, formatScore, getEmojiFlag } from './utils.ts';
+import { stripManiaFormat } from './utils.ts';
 
 export type MessageRecordBuildData = { wr: TrackRecord; track: Track };
 export type MessageCampaignBuildData = {
@@ -112,10 +113,7 @@ export class DiscordWebhook<MessageBuilderData> {
     return {
       embeds: [
         {
-          title: track.name.replace(
-            /(\$[0-9a-fA-F]{3}|\$[WNOITSGZBEMwnoitsgzbem]{1})/g,
-            '',
-          ),
+          title: escapeMarkdown(stripManiaFormat(track.name)),
           url: 'https://trackmania.io/#/leaderboard/' + track.uid,
           color: 15772743,
           fields: [
@@ -147,9 +145,9 @@ export class DiscordWebhook<MessageBuilderData> {
         (wr) => {
           // FIXME: Make track name extraction a RegExp in UpdateWebhook or remove this completely
           const trackName = trackMapping.get(wr.track_uid)?.name ?? '';
-          return `${trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName} | ${
-            formatScore(wr.score)
-          } by ${
+          return `${
+            escapeMarkdown(stripManiaFormat(trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName))
+          } | ${formatScore(wr.score)} by ${
             escapeMarkdown(
               wr.user.name,
             )
@@ -165,11 +163,13 @@ export class DiscordWebhook<MessageBuilderData> {
       ({ user, points }) => `${escapeMarkdown(user.name)}${getEmojiFlag(user)} (${points})`,
     );
 
+    const campaignName = escapeMarkdown(stripManiaFormat(campaign.name));
+
     return {
       content: [
-        `**${campaign.name} - World Records**\n${wrs.join('\n')}`,
-        `**${campaign.name} - WR Rankings**\n${wrRankings.join('\n')}`,
-        `**${campaign.name} - Campaign Rankings**\n${campaignRankings.join('\n')}`,
+        `**${campaignName} - World Records**\n${wrs.join('\n')}`,
+        `**${campaignName} - WR Rankings**\n${wrRankings.join('\n')}`,
+        `**${campaignName} - Campaign Rankings**\n${campaignRankings.join('\n')}`,
       ].join('\n\n'),
     };
   }

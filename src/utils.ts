@@ -46,3 +46,7 @@ export const getEmojiFlag = (user: TrackRecord['user']) => {
   const flag = country ? flags.list.find((flag: { name: string }) => flag.name === country) : null;
   return flag ? ' ' + flag.emoji : '';
 };
+
+export const stripManiaFormat = (text: string) => {
+  return text.replace(/(\$[0-9a-fA-F]{3}|\$[WNOITSGZBEMwnoitsgzbem]{1})/g, '');
+};
