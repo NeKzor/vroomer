@@ -145,7 +145,7 @@ const updateClub = async (ctx: Context) => {
     const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice(1, -1)) : null;
     const matchActivity = createActivityMatcher(campaignName, campaignNameRegex);
 
-    const activity = await ctx.trackmania.clubActivity(clubId);
+    const activity = await ctx.trackmania.clubActivity(clubId, 0, 100);
 
     const latestCampaignActivity = activity.activityList.find(matchActivity);
     if (!latestCampaignActivity) {
@@ -171,7 +171,7 @@ const updateClub = async (ctx: Context) => {
         const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice('regex:'.length)) : campaignName;
         const matchActivity = createActivityMatcher(campaignName, campaignNameRegex);
 
-        const activity = await ctx.trackmania.clubActivity(webhook.value.club_id.toString());
+        const activity = await ctx.trackmania.clubActivity(webhook.value.club_id.toString(), 0, 100);
 
         const campaignActivity = activity.activityList.find(matchActivity);
         if (!campaignActivity) {
