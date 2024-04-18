@@ -325,10 +325,10 @@ export class TrackmaniaClient {
 
     return await this.get<Campaigns>(api.join('?'), true);
   }
-  async leaderboard(groupOrSeasonId: string, mapId: string | undefined, offset: number, length: number) {
+  async leaderboard(groupOrSeasonId: string, mapId: string | undefined, offset: number, length: number, onlyWorld = true) {
     return await this.get<LeaderboardResponse>(
       `/leaderboard/group/${groupOrSeasonId}${mapId ? `/map/${mapId}` : ''}/top` +
-        `?offset=${offset}&length=${length}&onlyWorld=1`,
+        `?offset=${offset}&length=${length}${onlyWorld ? '&onlyWorld=1' : ''}`,
       true,
     );
   }
@@ -364,15 +364,34 @@ export class TrackmaniaClient {
 
     return await res.arrayBuffer();
   }
-  async clubActivity(clubId: string, offset = 0, length = 10, active = true) {
+  async clubActivity(clubId: number, offset = 0, length = 10, active = true) {
     return await this.get<ClubActivityResponse>(
       `/club/${clubId}/activity?offset=${offset}&length=${length}&active=${active ? 1 : 0}`,
       true,
     );
   }
-  async clubCampaign(clubId: string, campaignId: string) {
+  async clubCampaign(clubId: number, campaignId: number) {
     return await this.get<ClubCampaignResponse>(`/club/${clubId}/campaign/${campaignId}`, true);
   }
+  async clubMembers(clubId: number, length = 100, offset = 0) {
+    return await this.get<ClubMembersResponse>(`/club/${clubId}/member?length=${length}&offset=${offset}`, true);
+  }
+}
+
+export interface ClubMembersResponse {
+  clubMemberList: {
+    accountId: string;
+    clubId: number;
+    role: string;
+    creationTimestamp: number;
+    vip: boolean;
+    moderator: boolean;
+    hasFeatured: boolean;
+    pin: boolean;
+    useTag: boolean;
+  }[];
+  maxPage: number;
+  itemCount: number;
 }
 
 export enum ZoneType {
@@ -547,13 +566,35 @@ export interface Challenges {
 export type ChallengesLeaderboard = LeaderboardChallenge[];
 
 export type ClubActivity = {
-  campaignId: string;
+  id: number;
   name: string;
-  activityType: 'campaign';
+  activityType: 'campaign' | 'map-upload' | 'news' | 'room';
+  activityId: number;
+  targetActivityId: number;
+  campaignId: number;
+  position: number;
+  public: boolean;
+  active: boolean;
+  externalId: number;
+  featured: boolean;
+  password: boolean;
+  itemsCount: number;
+  clubId: number;
+  editionTimestamp: number;
+  creatorAccountId: string;
+  latestEditorAccountId: string;
+  mediaUrl: string;
+  mediaUrlPngLarge: string;
+  mediaUrlPngMedium: string;
+  mediaUrlPngSmall: string;
+  mediaUrlDds: string;
+  mediaTheme: string;
 };
 
 export type ClubActivityResponse = {
   activityList: ClubActivity[];
+  maxPage: number;
+  itemCount: number;
 };
 
 export type ClubCampaignResponse = {

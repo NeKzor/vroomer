@@ -139,7 +139,7 @@ const createActivityMatcher = (clubCampaignName: string, clubCampaignNameRegex: 
 
 const updateClub = async (ctx: Context) => {
   if (isUsingSingleClubMode) {
-    const clubId = Deno.env.get('CLUB_ID')!;
+    const clubId = Number(Deno.env.get('CLUB_ID')!);
     const campaignName = Deno.env.get('CLUB_CAMPAIGN_NAME')!;
     const isCampaignRegex = campaignName.at(0) === '/' && campaignName.at(-1) === '/';
     const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice(1, -1)) : null;
@@ -171,7 +171,7 @@ const updateClub = async (ctx: Context) => {
         const campaignNameRegex = isCampaignRegex ? new RegExp(campaignName.slice('regex:'.length)) : campaignName;
         const matchActivity = createActivityMatcher(campaignName, campaignNameRegex);
 
-        const activity = await ctx.trackmania.clubActivity(webhook.value.club_id.toString(), 0, 100);
+        const activity = await ctx.trackmania.clubActivity(webhook.value.club_id, 0, 100);
 
         const campaignActivity = activity.activityList.find(matchActivity);
         if (!campaignActivity) {
@@ -183,7 +183,7 @@ const updateClub = async (ctx: Context) => {
 
         const result = await updateCampaign(
           ctx,
-          webhook.value.club_id.toString(),
+          webhook.value.club_id,
           campaignActivity.campaignId,
           webhook.value.webhook_url,
         );
@@ -201,8 +201,8 @@ const updateClub = async (ctx: Context) => {
 
 const updateCampaign = async (
   ctx: Context,
-  clubId: string,
-  campaignId: string,
+  clubId: number,
+  campaignId: number,
   webhookUrl: string,
 ): Promise<
   [campaign: Campaign, trackWrs: Map<string, TrackRecord[]>, trackHistory: Map<string, TrackRecord[]>] | false
