@@ -332,6 +332,13 @@ export class TrackmaniaClient {
       true,
     );
   }
+  async clubLeaderboard(clubId: number, groupOrSeasonId: string, mapId: string | undefined, offset: number, length: number) {
+    return await this.get<LeaderboardResponse>(
+      `/leaderboard/group/${groupOrSeasonId}${mapId ? `/map/${mapId}` : ''}/club/${clubId}/top` +
+      `?offset=${offset}&length=${length}`,
+      true,
+    );
+  }
   async mapRecords(accountIdList: string[], mapIdList: string[]) {
     return await this.get<MapRecord[]>(
       `/mapRecords?accountIdList=${accountIdList.join(',')}&mapIdList=${mapIdList.join(',')}`,
