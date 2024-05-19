@@ -28,7 +28,7 @@ export type MessageCampaignBuildData = {
       zone: Zone[];
       name: string;
     };
-    points: number;
+    points: string;
   }[];
 };
 export type MessageBuilderFunction =
@@ -81,7 +81,7 @@ export class DiscordWebhook<MessageBuilderData> {
   async edit(webhookUrl: string, messageId: string, data: MessageBuilderData, lastCachedMessage = '') {
     const body = JSON.stringify(this.messageBuilder(data));
     if (lastCachedMessage.length && lastCachedMessage === body) {
-      return;
+      return body;
     }
 
     const url = `${webhookUrl}/messages/${messageId}`;
@@ -143,11 +143,10 @@ export class DiscordWebhook<MessageBuilderData> {
     const wrs = records
       .map(
         (wr) => {
-          // FIXME: Make track name extraction a RegExp in UpdateWebhook or remove this completely
           const trackName = trackMapping.get(wr.track_uid)?.name ?? '';
-          return `${
-            escapeMarkdown(stripManiaFormat(trackName.split(' - ')?.at(trackName.split(' - ').length - 2) ?? trackName))
-          } | ${formatScore(wr.score)} by ${
+          return `${escapeMarkdown(stripManiaFormat(DiscordWebhook.extractTrackName(trackName)))} | ${
+            formatScore(wr.score)
+          } by ${
             escapeMarkdown(
               wr.user.name,
             )
@@ -167,10 +166,28 @@ export class DiscordWebhook<MessageBuilderData> {
 
     return {
       content: [
-        `**${campaignName} - World Records**\n${wrs.join('\n')}`,
-        `**${campaignName} - WR Rankings**\n${wrRankings.join('\n')}`,
+        `**${campaignName} - Records**\n${wrs.join('\n')}`,
+        `**${campaignName} - Rankings**\n${wrRankings.join('\n')}`,
         `**${campaignName} - Campaign Rankings**\n${campaignRankings.join('\n')}`,
       ].join('\n\n'),
     };
+  }
+  static extractTrackName(trackName: string): string {
+    if (trackName.endsWith(' - Reverse') || trackName.endsWith(' - Checkpointless')) {
+      const start = trackName.indexOf(' - ');
+      const end = trackName.lastIndexOf(' - ');
+      if (start === end) {
+        return trackName.slice(0, end);
+      }
+
+      return trackName.slice(start + 3, end);
+    }
+
+    const trackNumber = trackName.split(' - ').at(1) ?? '';
+    if (/[0-9]{2}/.test(trackNumber)) {
+      return trackNumber;
+    }
+
+    return trackName;
   }
 }

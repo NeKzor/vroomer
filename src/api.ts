@@ -501,8 +501,82 @@ export enum CampaignType {
 }
 
 export interface Campaigns {
-  monthList: any;
-  campaignList: any;
+  itemCount: number;
+  // TODO: monthList vs campaignList
+  monthList: {
+    year: number;
+    month: number;
+    lastDay: number;
+    days: {
+      campaignId: number;
+      mapUid: string;
+      day: number;
+      monthDay: number;
+      seasonUid: string;
+      leaderboardGroup: null;
+      startTimestamp: number;
+      endTimestamp: number;
+      relativeStart: number;
+      relativeEnd: number;
+    }[];
+    media: {
+      buttonBackgroundUrl: string;
+      buttonForegroundUrl: string;
+      decalUrl: string;
+      popUpBackgroundUrl: string;
+      popUpImageUrl: string;
+      liveButtonBackgroundUrl: string;
+      liveButtonForegroundUrl: string;
+    };
+  }[];
+  campaignList: {
+    id: number;
+    seasonUid: string;
+    name: string;
+    color: string;
+    useCase: number;
+    clubId: number;
+    leaderboardGroupUid: string;
+    publicationTimestamp: number;
+    startTimestamp: number;
+    endTimestamp: number;
+    rankingSentTimestamp: null;
+    year: number;
+    week: number;
+    day: number;
+    monthYear: number;
+    month: number;
+    monthDay: number;
+    published: boolean;
+    playlist: {
+      id: number;
+      position: number;
+      mapUid: string;
+    }[];
+    latestSeasons: {
+      uid: string;
+      name: string;
+      startTimestamp: number;
+      endTimestamp: number;
+      relativeStart: number;
+      relativeEnd: number;
+      campaignId: number;
+      active: boolean;
+    }[];
+    categories: { position: number; length: number; name: string }[];
+    media: {
+      buttonBackgroundUrl: string;
+      buttonForegroundUrl: string;
+      decalUrl: string;
+      popUpBackgroundUrl: string;
+      popUpImageUrl: string;
+      liveButtonBackgroundUrl: string;
+      liveButtonForegroundUrl: string;
+    };
+    editionTimestamp: number;
+  }[];
+  nextRequestTimestamp: number;
+  relativeNextRequest: number;
 }
 
 export interface LeaderboardResponse {
@@ -517,14 +591,14 @@ export interface LeaderboardResponse {
       zoneName: string;
       position: number;
       score: number;
-      sp: number; // TODO: undefined when mapId given
+      sp: string; // TODO: undefined when mapId given
     }[];
   }[];
 }
 
 export interface ClubLeaderboardResponse {
   groupUid: string;
-  mapUid: string;
+  mapUid: string; // TODO: undefined when no mapId given
   clubId: number;
   length: number;
   top: {
@@ -532,7 +606,8 @@ export interface ClubLeaderboardResponse {
     zoneId: string;
     zoneName: string;
     position: number;
-    score: number;
+    score: number; // TODO: undefined when mo mapId given
+    sp: string; // TODO: undefined when mapId given
   }[];
 }
 

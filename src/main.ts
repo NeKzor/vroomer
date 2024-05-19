@@ -5,6 +5,7 @@ import { load } from 'dotenv/mod.ts';
 import { join } from 'path/mod.ts';
 import {
   Audiences,
+  CampaignType,
   ClubActivity,
   TrackmaniaClient,
   TrackmaniaOAuthClient,
@@ -118,18 +119,6 @@ const update = async () => {
   }
 };
 
-// TODO: Remove once Deno Deploy supports Array.fromAsync
-const fromAsync = async <T, U>(
-  iterableOrArrayLike: AsyncIterable<T>,
-  mapFn: (value: Awaited<T>) => U,
-): Promise<U[]> => {
-  const result: U[] = [];
-  for await (const entry of iterableOrArrayLike as AsyncIterable<T>) {
-    result.push(mapFn(entry));
-  }
-  return result;
-};
-
 const createActivityMatcher = (clubCampaignName: string, clubCampaignNameRegex: RegExp | string | null) =>
   clubCampaignName === 'latest'
     ? (activity: ClubActivity) => activity.activityType === 'campaign'
@@ -161,7 +150,7 @@ const updateClub = async (ctx: Context) => {
     const result = await updateCampaign(ctx, clubId, latestCampaignActivity.campaignId, webhookRecordUpdateUrl);
     if (result) {
       const [campaign, trackWrs, trackHistory] = result;
-      await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory);
+      await sendCampaignUpdate(ctx, clubId, campaign, trackWrs, trackHistory);
     }
   } else {
     for await (const webhook of kv.list<UpdateWebhook>({ prefix: ['webhook_updates'] })) {
@@ -190,7 +179,7 @@ const updateClub = async (ctx: Context) => {
 
         if (result) {
           const [campaign, trackWrs, trackHistory] = result;
-          await sendCampaignUpdate(ctx, campaign, trackWrs, trackHistory, webhook);
+          await sendCampaignUpdate(ctx, undefined, campaign, trackWrs, trackHistory, webhook);
         }
       } catch (err) {
         logger.error(err);
@@ -214,7 +203,7 @@ const updateCampaign = async (
   let campaign = (await kv.get<Campaign>(campaignKey)).value;
 
   const tracks = campaign
-    ? await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
+    ? await Array.fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value)
     : [];
 
   if (!campaign) {
@@ -277,7 +266,7 @@ const updateCampaign = async (
       continue;
     }
 
-    const [wrs, history, newUpdates] = await updateRecords(ctx, campaign, track, mapId, webhookUrl);
+    const [wrs, history, newUpdates] = await updateRecords(ctx, clubId, campaign, track, mapId, webhookUrl);
 
     trackWrs.set(track.uid, wrs);
     trackHistory.set(track.uid, history);
@@ -289,22 +278,25 @@ const updateCampaign = async (
 
 const updateRecords = async (
   ctx: Context,
+  clubId: number,
   campaign: Campaign,
   track: Track,
   mapId: string,
   webhookUrl: string,
 ): Promise<[wrs: TrackRecord[], history: TrackRecord[], updates: number]> => {
-  const worldLeaderboard = (await ctx.trackmania.leaderboard(campaign.uid, track.uid, 0, 5)).tops.at(0);
+  const leaderboard = isUsingSingleClubMode
+    ? (await ctx.trackmania.clubLeaderboard(clubId, campaign.uid, track.uid, 0, 5))
+    : (await ctx.trackmania.leaderboard(campaign.uid, track.uid, 0, 5)).tops.at(0);
 
   let updates = 0;
   let wrScore = undefined;
 
   const recordsKey = ['records', campaign.uid, track.uid];
   const latestScore = Math.min(
-    ...await fromAsync(kv.list<TrackRecord>({ prefix: recordsKey }), ({ value }) => value.score),
+    ...await Array.fromAsync(kv.list<TrackRecord>({ prefix: recordsKey }), ({ value }) => value.score),
   );
 
-  for (const { accountId, zoneId, score } of worldLeaderboard?.top ?? []) {
+  for (const { accountId, zoneId, score } of leaderboard?.top ?? []) {
     if (wrScore === undefined || wrScore === score) {
       wrScore = score;
 
@@ -362,20 +354,32 @@ const updateRecords = async (
 
 const sendCampaignUpdate = async (
   ctx: Context,
+  clubId: number | undefined,
   campaign: Campaign,
   trackWrs: Map<string, TrackRecord[]>,
   trackHistory: Map<string, TrackRecord[]>,
   webhook?: Deno.KvEntry<UpdateWebhook>,
 ) => {
   try {
-    const topWorldRankings = (await ctx.trackmania.leaderboard(campaign.uid, undefined, 0, 5)).tops?.at(0)?.top ?? [];
+    const topWorldRankings = await (async () => {
+      if (clubId) {
+        // FIXME: Figure out a way to get the actual group UID. For now take the latest.
+        const campaigns = await trackmania.campaigns(CampaignType.Official, 0, 1);
+        const groupUid = campaigns.campaignList.at(0)!.leaderboardGroupUid;
+        return (await ctx.trackmania.clubLeaderboard(clubId, groupUid, undefined, 0, 5)).top ?? [];
+      } else {
+        return (await ctx.trackmania.leaderboard(campaign.uid, undefined, 0, 5)).tops?.at(0)?.top ?? [];
+      }
+    })();
+
+    console.dir({ topWorldRankings });
     await nameResolver.downloadAll(
       topWorldRankings.map((ranking) => ranking.accountId),
     );
 
     const data = {
       campaign,
-      tracks: await fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
+      tracks: await Array.fromAsync(kv.list<Track>({ prefix: ['tracks', campaign.uid] }), ({ value }) => value),
       records: Array.from(trackWrs.values()).flat(),
       rankings: topWorldRankings.map((ranking) => {
         return {
@@ -394,18 +398,19 @@ const sendCampaignUpdate = async (
       const messageId = Deno.env.get('DISCORD_CAMPAIGN_UPDATE_MESSAGE_ID')!;
       switch (messageId) {
         case 'fixme': {
+          discordCampaignUpdateCache = await discordCampaignUpdate.send(
+            Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
+            data,
+          );
+          break;
+        }
+        default: {
+          console.log(discordCampaignUpdateCache);
           discordCampaignUpdateCache = await discordCampaignUpdate.edit(
             Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
             messageId,
             data,
             discordCampaignUpdateCache,
-          );
-          break;
-        }
-        default: {
-          discordCampaignUpdateCache = await discordCampaignUpdate.send(
-            Deno.env.get('DISCORD_WEBHOOK_CAMPAIGN_UPDATE')!,
-            data,
           );
           break;
         }
@@ -455,7 +460,6 @@ kv.listenQueue(async (message) => {
       }
 
       if (replayStoragePath !== 'none') {
-        let file: Deno.FsFile | undefined;
         try {
           const folderPath = join(replayStoragePath, campaign.uid, track.uid);
           await Deno.mkdir(folderPath, { recursive: true });
@@ -464,7 +468,7 @@ kv.listenQueue(async (message) => {
             .join('_')
             .replaceAll(/[\\/ ]/g, '_') + '.replay.gbx';
 
-          file = await Deno.open(join(folderPath, fileName), { write: true, createNew: true });
+          using file = await Deno.open(join(folderPath, fileName), { write: true, createNew: true });
 
           const url = `https://prod.trackmania.core.nadeo.online/storageObjects/${wr.uid}`;
 
@@ -475,11 +479,6 @@ kv.listenQueue(async (message) => {
           await res.body?.pipeTo(file.writable);
         } catch (err) {
           logger.error(err);
-        } finally {
-          try {
-            file?.close();
-            // deno-lint-ignore no-empty
-          } catch {}
         }
       }
       break;
@@ -489,7 +488,7 @@ kv.listenQueue(async (message) => {
   flushFileLogger();
 });
 
-Deno.cron('Update', '*/1 * * * *', { backoffSchedule: [30_000] }, async () => {
+Deno.cron('Update', Deno.env.get('CRON_UPDATE_FORMAT')!, { backoffSchedule: [30_000] }, async () => {
   logger.info('Updating');
   await update();
   flushFileLogger();

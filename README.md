@@ -2,13 +2,13 @@
 
 # vroomer
 
-Campaign world record updates for your Trackmania club!
+Campaign record updates for your Trackmania club!
 
 https://github.com/NeKzor/vroomer/assets/16884507/ce0bb832-b612-45d3-9677-f97fffbd642a
 
 ## Features
 
-- World records updates and statistics
+- Records updates and statistics
 - Campaign overview and rankings
 - Replay storage
 - Can be managed via application commands
@@ -23,7 +23,9 @@ https://github.com/NeKzor/vroomer/assets/16884507/ce0bb832-b612-45d3-9677-f97fff
 
 ## Usage
 
-### Single Mode Club (Deno Deploy)
+### Single Mode Club
+
+> NOTE: Works on Deno Deploy.
 
 - Create .env file `cp .env.example .env`
 - Configure `.env`
