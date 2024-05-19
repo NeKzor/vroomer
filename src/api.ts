@@ -325,17 +325,29 @@ export class TrackmaniaClient {
 
     return await this.get<Campaigns>(api.join('?'), true);
   }
-  async leaderboard(groupOrSeasonId: string, mapId: string | undefined, offset: number, length: number, onlyWorld = true) {
+  async leaderboard(
+    groupOrSeasonId: string,
+    mapId: string | undefined,
+    offset: number,
+    length: number,
+    onlyWorld = true,
+  ) {
     return await this.get<LeaderboardResponse>(
       `/leaderboard/group/${groupOrSeasonId}${mapId ? `/map/${mapId}` : ''}/top` +
         `?offset=${offset}&length=${length}${onlyWorld ? '&onlyWorld=1' : ''}`,
       true,
     );
   }
-  async clubLeaderboard(clubId: number, groupOrSeasonId: string, mapId: string | undefined, offset: number, length: number) {
-    return await this.get<LeaderboardResponse>(
+  async clubLeaderboard(
+    clubId: number,
+    groupOrSeasonId: string,
+    mapId: string | undefined,
+    offset: number,
+    length: number,
+  ) {
+    return await this.get<ClubLeaderboardResponse>(
       `/leaderboard/group/${groupOrSeasonId}${mapId ? `/map/${mapId}` : ''}/club/${clubId}/top` +
-      `?offset=${offset}&length=${length}`,
+        `?offset=${offset}&length=${length}`,
       true,
     );
   }
@@ -510,6 +522,20 @@ export interface LeaderboardResponse {
   }[];
 }
 
+export interface ClubLeaderboardResponse {
+  groupUid: string;
+  mapUid: string;
+  clubId: number;
+  length: number;
+  top: {
+    accountId: string;
+    zoneId: string;
+    zoneName: string;
+    position: number;
+    score: number;
+  }[];
+}
+
 export interface MapRecord {
   accountId: string;
   filename: string;
@@ -575,7 +601,7 @@ export type ChallengesLeaderboard = LeaderboardChallenge[];
 export type ClubActivity = {
   id: number;
   name: string;
-  activityType: 'campaign' | 'map-upload' | 'news' | 'room';
+  activityType: 'campaign' | 'map-upload' | 'news' | 'room' | 'ranking-official';
   activityId: number;
   targetActivityId: number;
   campaignId: number;
