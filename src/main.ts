@@ -314,7 +314,7 @@ const updateRecords = async (
         continue;
       }
 
-      // // https://core.trackmania.nadeo.live/mapRecords/<UUID>/replay
+      // https://core.trackmania.nadeo.live/mapRecords/<UUID>/replay
       const uid = record.url.slice(-43, -7);
 
       wrScore = record.recordScore.time;
