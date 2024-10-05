@@ -83,7 +83,8 @@ events.interactionCreate = async (interaction) => {
           } else {
             throw '';
           }
-        } catch (err) {
+          // deno-lint-ignore no-explicit-any
+        } catch (err: any) {
           log.error(
             `[Command: ${bgYellow(black(String(source)))} - ${
               bgBlack(red(`Error`))
